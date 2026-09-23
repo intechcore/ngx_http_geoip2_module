@@ -38,8 +38,8 @@ WORKDIR /build
 # not in keys/ fails here on purpose: verify the new key, then add it.
 COPY keys/ keys/
 RUN cat keys/*.key | gpg --dearmor > nginx-keyring.gpg && \
-    curl -fsSLO "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" && \
-    curl -fsSLO "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz.asc" && \
+    curl -fsSLO --proto '=https' --tlsv1.2 "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" && \
+    curl -fsSLO --proto '=https' --tlsv1.2 "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz.asc" && \
     gpgv --keyring ./nginx-keyring.gpg \
         "nginx-${NGINX_VERSION}.tar.gz.asc" "nginx-${NGINX_VERSION}.tar.gz" && \
     tar xzf "nginx-${NGINX_VERSION}.tar.gz"
@@ -47,16 +47,17 @@ RUN cat keys/*.key | gpg --dearmor > nginx-keyring.gpg && \
 COPY config ngx_http_geoip2_module.c ngx_stream_geoip2_module.c module/
 
 WORKDIR /build/nginx-${NGINX_VERSION}
-RUN ./configure --with-compat --add-dynamic-module=../module && \
+RUN ./configure --with-compat --with-stream --add-dynamic-module=../module && \
     make modules && \
-    cp objs/ngx_http_geoip2_module.so /build/
+    cp objs/ngx_http_geoip2_module.so objs/ngx_stream_geoip2_module.so /build/
 
 FROM nginx:${NGINX_VERSION}-trixie AS test
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libmaxminddb0 && \
     rm -rf /var/lib/apt/lists/*
-COPY --from=build /build/ngx_http_geoip2_module.so /usr/lib/nginx/modules/
+COPY --from=build /build/ngx_http_geoip2_module.so /build/ngx_stream_geoip2_module.so \
+     /usr/lib/nginx/modules/
 COPY tests/nginx.conf /etc/nginx/nginx.conf
 
 # Coverage build for SonarCloud, used by CI only. It rebuilds both modules
@@ -74,7 +75,7 @@ RUN make clean && \
     ./configure --with-compat --with-stream --add-dynamic-module=../module \
         --with-cc-opt=--coverage --with-ld-opt=--coverage && \
     bear --output /build/compile_commands.json -- make modules && \
-    cp objs/ngx_http_geoip2_module.so /usr/lib/nginx/modules/
+    cp objs/ngx_http_geoip2_module.so objs/ngx_stream_geoip2_module.so /usr/lib/nginx/modules/
 COPY tests/nginx.conf /etc/nginx/nginx.conf
 RUN sed -i '1i user root;' /etc/nginx/nginx.conf
 
@@ -82,6 +83,8 @@ FROM scratch AS module
 ARG NGINX_VERSION
 COPY --from=build /build/ngx_http_geoip2_module.so /ngx_http_geoip2_module.so
 COPY LICENSE /LICENSE
+# Nothing runs in this image. It only carries files for COPY --from.
+USER 65534:65534
 LABEL org.opencontainers.image.title="ngx_http_geoip2_module" \
       org.opencontainers.image.description="nginx GeoIP2 dynamic module for nginx ${NGINX_VERSION} (Debian trixie)" \
       org.opencontainers.image.source="https://github.com/intechcore/ngx_http_geoip2_module" \

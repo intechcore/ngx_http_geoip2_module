@@ -14,6 +14,7 @@ set -euo pipefail
 
 IMAGE=${1:?usage: tests/run.sh <test image>}
 FIXTURES="$(cd "$(dirname "$0")/fixtures" && pwd)"
+CONF="$(cd "$(dirname "$0")/conf" && pwd)"
 IPV4=203.0.113.10
 IPV6=2001:db8::1
 UNKNOWN=198.51.100.1
@@ -27,7 +28,7 @@ port=""
 
 # Stop nginx gracefully, so an instrumented module can write its counters.
 cleanup() {
-  if [ -n "$container" ]; then
+  if [[ -n "$container" ]]; then
     docker stop -t 10 "$container" >/dev/null 2>&1 || true
     docker rm -f "$container" >/dev/null 2>&1 || true
     container=""
@@ -47,7 +48,7 @@ not_ok() {
 
 # check <name> <expected> <actual>
 check() {
-  if [ "$2" = "$3" ]; then
+  if [[ "$2" = "$3" ]]; then
     ok "$1"
   else
     not_ok "$1: expected '$2', got '$3'"
@@ -122,6 +123,30 @@ else
   not_ok "nginx -t accepts the module and the geoip2 block"
 fi
 
+# rejected <name> <file in tests/conf> <expected message>: nginx -t must fail
+# with the message, and must not crash (exit code 139 is a segfault).
+rejected() {
+  local out rc=0
+  out=$(docker run --rm -v "$FIXTURES:/fixtures:ro" -v "$CONF:/conf:ro" \
+    ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"} --entrypoint nginx "$IMAGE" \
+    -t -c "/conf/$2" 2>&1) || rc=$?
+  if [[ $rc -eq 0 ]]; then
+    not_ok "$1: accepted"
+  elif [[ $rc -eq 139 ]]; then
+    not_ok "$1: nginx crashed"
+  elif [[ $out != *"$3"* ]]; then
+    not_ok "$1: message missing, got: $out"
+  else
+    ok "$1"
+  fi
+}
+
+echo "configuration"
+rejected "invalid auto_reload interval in http (upstream #90)" bad-interval-http.conf \
+  'invalid interval for auto_reload "bogus"'
+rejected "invalid auto_reload interval in stream" bad-interval-stream.conf \
+  'invalid interval for auto_reload "bogus"'
+
 echo "lookups"
 start
 check "IPv4 address" DE "$(lookup "$IPV4")"
@@ -153,4 +178,4 @@ no_crash "reload with an old mtime"
 
 echo
 echo "$passed passed, $failed failed"
-[ "$failed" -eq 0 ]
+[[ "$failed" -eq 0 ]]
