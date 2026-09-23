@@ -8,6 +8,13 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
 - A heap overflow in both modules: a uint128 value (34 characters) or a double with 14 or
   more integer digits went into a buffer of 20 bytes. The buffer now holds 64 bytes, and
   the write is bounded.
+- `$var metadata` without a field read past the arguments of the directive, and `$var;`
+  without arguments read past them as well. Both modules.
+
+### Changed
+- A `$var metadata` directive with an unknown field or a wrong number of arguments is now a
+  configuration error. Before, the variable was empty at run time, and a field matched by
+  its prefix only: `build_epochs` gave the build epoch.
 - The stream module crashed `nginx -t` on an invalid `auto_reload` interval. It passed the
   string by value to `%V`. Upstream fixed the same line in the http module (#90), not in the
   stream module. Found by SonarCloud (c:S5270).

@@ -43,8 +43,12 @@ typedef struct {
 
 typedef struct {
     ngx_http_geoip2_db_t     *database;
-    ngx_str_t                metavalue;
+    ngx_uint_t               field;
 } ngx_http_geoip2_metadata_t;
+
+#define NGX_HTTP_GEOIP2_BUILD_EPOCH  0
+#define NGX_HTTP_GEOIP2_LAST_CHECK   1
+#define NGX_HTTP_GEOIP2_LAST_CHANGE  2
 
 
 static ngx_int_t ngx_http_geoip2_variable(ngx_http_request_t *r,
@@ -325,15 +329,16 @@ ngx_http_geoip2_metadata(ngx_http_request_t *r, ngx_http_variable_value_t *v,
     ngx_http_geoip2_db_t        *database = metadata->database;
     u_char                      *p;
 
-    if (ngx_strncmp(metadata->metavalue.data, "build_epoch", 11) == 0) {
-        FORMAT("%uL", database->mmdb.metadata.build_epoch);
-    } else if (ngx_strncmp(metadata->metavalue.data, "last_check", 10) == 0) {
-        FORMAT("%T", database->last_check);
-    } else if (ngx_strncmp(metadata->metavalue.data, "last_change", 11) == 0) {
-        FORMAT("%T", database->last_change);
-    } else {
-        v->not_found = 1;
-        return NGX_OK;
+    switch (metadata->field) {
+        case NGX_HTTP_GEOIP2_BUILD_EPOCH:
+            FORMAT("%uL", database->mmdb.metadata.build_epoch);
+            break;
+        case NGX_HTTP_GEOIP2_LAST_CHECK:
+            FORMAT("%T", database->last_check);
+            break;
+        default: /* NGX_HTTP_GEOIP2_LAST_CHANGE */
+            FORMAT("%T", database->last_change);
+            break;
     }
 
     v->valid = 1;
@@ -384,7 +389,7 @@ ngx_http_geoip2(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
-    if (value[1].data && value[1].data[0] != '/') {
+    if (value[1].data[0] != '/') {
         if (ngx_conf_full_name(cf->cycle, &value[1], 0) != NGX_OK) {
             return NGX_CONF_ERROR;
         }
@@ -491,19 +496,14 @@ ngx_http_geoip2_add_variable(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
 
     value = cf->args->elts;
 
-    if (value[0].data[0] != '$') {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid variable name \"%V\"", &value[0]);
-        return NGX_CONF_ERROR;
-    }
-
+    /* ngx_http_geoip2_parse_config calls this only for a name with a '$' */
     value[0].len--;
     value[0].data++;
 
     nelts = (int) cf->args->nelts;
     database = (ngx_http_geoip2_db_t *) conf;
 
-    if (nelts > 0 && value[1].len == 8 && ngx_strncmp(value[1].data, "metadata", 8) == 0) {
+    if (nelts > 1 && value[1].len == 8 && ngx_strncmp(value[1].data, "metadata", 8) == 0) {
         return ngx_http_geoip2_add_variable_metadata(cf, database);
     }
 
@@ -526,8 +526,27 @@ ngx_http_geoip2_add_variable_metadata(ngx_conf_t *cf, ngx_http_geoip2_db_t *data
     value = cf->args->elts;
     name = value[0];
 
+    if (cf->args->nelts != 3) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid number of arguments for metadata \"$%V\"",
+                           &name);
+        return NGX_CONF_ERROR;
+    }
+
+    if (ngx_strcmp(value[2].data, "build_epoch") == 0) {
+        metadata->field = NGX_HTTP_GEOIP2_BUILD_EPOCH;
+    } else if (ngx_strcmp(value[2].data, "last_check") == 0) {
+        metadata->field = NGX_HTTP_GEOIP2_LAST_CHECK;
+    } else if (ngx_strcmp(value[2].data, "last_change") == 0) {
+        metadata->field = NGX_HTTP_GEOIP2_LAST_CHANGE;
+    } else {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid metadata field \"%V\" for \"$%V\"",
+                           &value[2], &name);
+        return NGX_CONF_ERROR;
+    }
+
     metadata->database = database;
-    metadata->metavalue = value[2];
 
     var = ngx_http_add_variable(cf, &name, NGX_HTTP_VAR_CHANGEABLE);
     if (var == NULL) {
