@@ -315,6 +315,7 @@ The Dockerfile stages:
 | `test` | `nginx:<nginx>-trixie` with both modules, for `tests/run.sh` |
 | `coverage` | a gcov build for `tests/coverage.sh` and SonarCloud |
 | `asan` | nginx and both modules built with AddressSanitizer and UndefinedBehaviorSanitizer |
+| `analyze` | the static analyzers on the build tree of `coverage`; a finding fails the build |
 | `build-alpine`, `test-alpine` | the same build and test image for `nginx:<nginx>-alpine` |
 | `binaries`, `binaries-alpine` | the modules as files for the release |
 | `module` | the published image, the default stage |
@@ -326,6 +327,7 @@ make test          # build for nginx mainline and run tests/run.sh
 make test-alpine   # the same for nginx:<nginx>-alpine
 make integration   # run the integration tests
 make asan          # run the tests with AddressSanitizer and UndefinedBehaviorSanitizer
+make analyze       # run gcc -fanalyzer, clang-tidy and cppcheck
 make coverage      # run the tests on the gcov build, fail below 100% coverage
 make module        # build the module image
 make fixtures      # regenerate tests/fixtures/*.mmdb
@@ -358,6 +360,10 @@ cache fix of upstream #134 taken out, this test fails.
 allocation of nginx is its own `malloc` there, so AddressSanitizer also finds an overflow inside
 a pool block. A sanitizer report fails the tests.
 
+`make analyze` runs three static analyzers on both modules: `gcc -fanalyzer`, `clang-tidy` (the
+clang static analyzer, bugprone and cert checks) and `cppcheck`. `scripts/analyze.sh` lists the
+checks left out and why. Any finding fails the build.
+
 `tests/coverage.sh` runs the same tests on the gcov build and fails below 100% line or branch
 coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocation failures.
 
@@ -365,7 +371,7 @@ coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocat
 
 | Event | What runs |
 |---|---|
-| A pull request | CI builds both modules and runs `tests/run.sh` for nginx mainline and stable, on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the shell scripts, Hadolint checks the `Dockerfile`. The integration tests run in each of these jobs, and a sanitizer build runs both test sets too. SonarCloud and CodeQL analyze the code. |
+| A pull request | CI builds both modules and runs `tests/run.sh` for nginx mainline and stable, on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the shell scripts, Hadolint checks the `Dockerfile`. The integration tests run in each of these jobs, and a sanitizer build runs both test sets too. gcc -fanalyzer, clang-tidy, cppcheck, SonarCloud and CodeQL analyze the code. |
 | A merge to `master` that changes `config`, `ngx_*.c`, `ngx_*.h`, `Dockerfile` or `keys/` | The publish workflow runs the tests again. It then pushes the image `<nginx>-<n>` and creates the GitHub release with the same tag, for mainline and stable. A merge that only bumps the version of one branch publishes only that branch. The build is reproducible: if the modules equal the last release of that nginx version, nothing is published. |
 | A publish, and once a week | The verify workflow takes the latest release and image of each nginx branch as a user does. It checks `SHA256SUMS`, `LICENSE` and the attestations, and that the image holds the release modules. It then runs `tests/run.sh` and the integration tests on a clean `nginx:<version>-trixie` and `nginx:<version>-alpine` image with the released modules, on amd64 and arm64. |
 | A new `nginx:<version>-trixie` image | Renovate opens a pull request that sets the new version in the `Dockerfile` (`NGINX_MAINLINE` or `NGINX_STABLE`) and in the README examples. Its merge publishes the modules for that nginx version. |

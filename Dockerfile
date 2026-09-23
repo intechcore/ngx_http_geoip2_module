@@ -12,7 +12,7 @@
 # binaries holds both modules for the GitHub release, module (the default) is
 # the published image. build-alpine, test-alpine and binaries-alpine do the
 # same for the nginx:<version>-alpine image (musl). asan runs the tests with
-# sanitizers.
+# sanitizers, analyze runs the static analyzers.
 
 # The two nginx branches. Renovate keeps both on the latest release: mainline
 # has an odd minor version, stable an even one. CI builds each of them with
@@ -127,6 +127,17 @@ COPY tests/nginx.conf /etc/nginx/nginx.conf
 # each dynamic module, which the ODR check reports. The other checks stay on.
 ENV ASAN_OPTIONS=detect_leaks=0:detect_odr_violation=0:abort_on_error=1 \
     UBSAN_OPTIONS=print_stacktrace=1
+
+# Static analysis, used by CI only: gcc -fanalyzer, clang-tidy and cppcheck
+# on the build tree and the compile commands of the coverage stage. A finding
+# fails the build of this stage.
+FROM coverage AS analyze
+# hadolint ignore=DL3008
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends clang-tidy cppcheck && \
+    rm -rf /var/lib/apt/lists/*
+COPY scripts/analyze.sh /usr/local/bin/analyze.sh
+RUN analyze.sh
 
 # The http and the stream module as files, for docker build --output. The
 # publish workflow attaches them to the GitHub release.

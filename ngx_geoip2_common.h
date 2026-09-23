@@ -10,8 +10,8 @@
  */
 
 
-#ifndef _NGX_GEOIP2_COMMON_H_INCLUDED_
-#define _NGX_GEOIP2_COMMON_H_INCLUDED_
+#ifndef NGX_GEOIP2_COMMON_H_INCLUDED
+#define NGX_GEOIP2_COMMON_H_INCLUDED
 
 
 #include <ngx_config.h>
@@ -610,4 +610,4 @@ ngx_geoip2_cleanup(void *data)
 }
 
 
-#endif /* _NGX_GEOIP2_COMMON_H_INCLUDED_ */
+#endif /* NGX_GEOIP2_COMMON_H_INCLUDED */
