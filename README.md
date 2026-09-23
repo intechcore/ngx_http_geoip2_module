@@ -239,6 +239,30 @@ Default: off. The module checks the file at most once per interval, after a requ
 session. It loads the file again if the mtime is newer, or if the inode or the size has changed.
 If the file is missing or broken, the module logs an error and keeps the loaded database.
 
+### Updating a database
+
+Each nginx process maps the database file into its memory. A write into the loaded file changes
+that memory under the process. A lookup then reads a half written file, and the worker can die
+with `SIGBUS` (`worker process exited on signal 7`, upstream
+[#98](https://github.com/leev/ngx_http_geoip2_module/issues/98)).
+
+Replace the file, never overwrite it:
+
+1. Write the new database to a temporary file in the same directory.
+2. Rename it over the old file with `mv`. The rename is atomic on one filesystem, and the old
+   file stays mapped until nginx loads the new one.
+3. Let `auto_reload` load it, or run `nginx -s reload`.
+
+```sh
+curl -fsSL -o /usr/share/GeoIP/GeoLite2-Country.mmdb.new "$DATABASE_URL"
+mv /usr/share/GeoIP/GeoLite2-Country.mmdb.new /usr/share/GeoIP/GeoLite2-Country.mmdb
+```
+
+Do not update the file with `cp` over it or with a download tool that writes into it: these
+write into the loaded file. Do not `mv` it from another filesystem either: that is a copy, not
+an atomic rename. MaxMind `geoipupdate` writes a temporary file and renames it, so it is safe. On a network filesystem, such as NFS or AWS EFS,
+another host can change the file under nginx. Keep a local copy there.
+
 ### geoip2_proxy, geoip2_proxy_recursive
 
 ```nginx
