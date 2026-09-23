@@ -1,6 +1,7 @@
 # ngx_http_geoip2_module (intechcore fork)
 
 [![CI](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml/badge.svg)](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml)
+[![Verify release](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/verify-release.yml/badge.svg)](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/verify-release.yml)
 [![Release](https://img.shields.io/github/v/release/intechcore/ngx_http_geoip2_module)](https://github.com/intechcore/ngx_http_geoip2_module/releases)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-orange.svg)](LICENSE)
 
@@ -365,6 +366,7 @@ coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocat
 |---|---|
 | A pull request | CI builds both modules and runs `tests/run.sh` for nginx mainline and stable, on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the shell scripts, Hadolint checks the `Dockerfile`. A sanitizer build runs the tests too, and the integration tests run on Debian, Alpine and the sanitizer build. SonarCloud and CodeQL analyze the code. |
 | A merge to `master` that changes `config`, `ngx_*.c`, `ngx_*.h`, `Dockerfile` or `keys/` | The publish workflow runs the tests again. It then pushes the image `<nginx>-<n>` and creates the GitHub release with the same tag, for mainline and stable. A merge that only bumps the version of one branch publishes only that branch. The build is reproducible: if the modules equal the last release of that nginx version, nothing is published. |
+| A publish, and once a week | The verify workflow takes the latest release and image of each nginx branch as a user does. It checks `SHA256SUMS`, `LICENSE` and the attestations, and that the image holds the release module. It then runs `tests/run.sh` and the integration tests on a clean `nginx:<version>-trixie` and `nginx:<version>-alpine` image with the released modules, on amd64 and arm64. |
 | A new `nginx:<version>-trixie` image | Renovate opens a pull request that sets the new version in the `Dockerfile` (`NGINX_MAINLINE` or `NGINX_STABLE`) and in the README examples. Its merge publishes the modules for that nginx version. |
 
 The image and the release files carry a build provenance attestation.
