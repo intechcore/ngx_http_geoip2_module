@@ -1,6 +1,7 @@
 # ngx_http_geoip2_module (intechcore fork)
 
 [![CI](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml/badge.svg)](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/intechcore/ngx_http_geoip2_module)](https://github.com/intechcore/ngx_http_geoip2_module/releases)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-orange.svg)](LICENSE)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=intechcore_ngx_http_geoip2_module&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=intechcore_ngx_http_geoip2_module)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=intechcore_ngx_http_geoip2_module&metric=coverage)](https://sonarcloud.io/summary/new_code?id=intechcore_ngx_http_geoip2_module)
@@ -25,6 +26,7 @@ Upstream has had no commits since 2024-04. This fork adds:
   type, lookups, `geoip2_proxy`, metadata, `auto_reload` and its errors, and invalid
   configuration. See `tests/`.
 - Prebuilt module images for the official nginx images (Debian trixie), amd64 and arm64.
+- Prebuilt module binaries, http and stream, in the GitHub releases.
 
 The module code otherwise stays as in upstream. Fixes go back upstream where possible.
 
@@ -49,8 +51,29 @@ gh attestation verify oci://ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6-1 \
   --owner intechcore
 ```
 
-The image holds the http module only. The stream module is built and tested, but it is not
-published.
+The image holds the http module only. The releases hold both modules.
+
+## Prebuilt binaries
+
+Each image tag has a [GitHub release](https://github.com/intechcore/ngx_http_geoip2_module/releases)
+with the same name. It holds `ngx_http_geoip2_module-<nginx>-<arch>.so` and
+`ngx_stream_geoip2_module-<nginx>-<arch>.so` for amd64 and arm64, and `SHA256SUMS`.
+
+The modules are built on Debian trixie with `--with-compat`. They load into the same nginx version
+from the official `nginx:<version>-trixie` image or the nginx.org packages for trixie. They need
+`libmaxminddb0`.
+
+The commands below take the http module from the latest release. For another nginx version,
+pass its tag to `gh release download`.
+
+```sh
+gh release download --repo intechcore/ngx_http_geoip2_module \
+  --pattern 'ngx_http_geoip2_module-*-amd64.so' --pattern SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS
+gh attestation verify ngx_http_geoip2_module-*-amd64.so --owner intechcore
+sudo install -m 644 ngx_http_geoip2_module-*-amd64.so \
+  /usr/lib/nginx/modules/ngx_http_geoip2_module.so
+```
 
 ## Build and test
 

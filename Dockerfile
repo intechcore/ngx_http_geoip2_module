@@ -8,7 +8,8 @@
 #        /ngx_http_geoip2_module.so /usr/lib/nginx/modules/
 #
 # Stages: build compiles, test adds the module to nginx for tests/run.sh,
-# module (the default) is the published image.
+# binaries holds both modules for the GitHub release, module (the default) is
+# the published image.
 
 # renovate: nginx
 ARG NGINX_VERSION=1.31.6
@@ -78,6 +79,11 @@ RUN make clean && \
     bear --output /build/compile_commands.json -- make modules && \
     cp objs/ngx_http_geoip2_module.so objs/ngx_stream_geoip2_module.so /usr/lib/nginx/modules/
 COPY tests/nginx.conf /etc/nginx/nginx.conf
+
+# The http and the stream module as files, for docker build --output. The
+# publish workflow attaches them to the GitHub release.
+FROM scratch AS binaries
+COPY --from=build /build/ngx_http_geoip2_module.so /build/ngx_stream_geoip2_module.so /
 
 FROM scratch AS module
 ARG NGINX_VERSION
