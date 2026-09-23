@@ -59,6 +59,24 @@ RUN apt-get update && \
 COPY --from=build /build/ngx_http_geoip2_module.so /usr/lib/nginx/modules/
 COPY tests/nginx.conf /etc/nginx/nginx.conf
 
+# Coverage build for SonarCloud, used by CI only. It rebuilds both modules
+# (http and stream) with gcov instrumentation and records the compile commands
+# with bear. The http module then replaces the test module. Workers run as root
+# here, so they can write the gcov counters to any mounted directory.
+FROM build AS coverage
+# hadolint ignore=DL3008
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends bear gcovr libmaxminddb0 && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /build/nginx-${NGINX_VERSION}
+RUN make clean && \
+    ./configure --with-compat --with-stream --add-dynamic-module=../module \
+        --with-cc-opt=--coverage --with-ld-opt=--coverage && \
+    bear --output /build/compile_commands.json -- make modules && \
+    cp objs/ngx_http_geoip2_module.so /usr/lib/nginx/modules/
+COPY tests/nginx.conf /etc/nginx/nginx.conf
+RUN sed -i '1i user root;' /etc/nginx/nginx.conf
+
 FROM scratch AS module
 ARG NGINX_VERSION
 COPY --from=build /build/ngx_http_geoip2_module.so /ngx_http_geoip2_module.so
