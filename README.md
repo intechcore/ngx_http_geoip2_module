@@ -186,7 +186,9 @@ $variable_name [default=<value>] [source=$variable_with_ip] [escape=uri] <path> 
 ```
 
 - `path` is the path of the value in the database record, for example `country iso_code`. An
-  array element takes its index: `subdivisions 0 iso_code`.
+  array element takes its index: `subdivisions 0 iso_code`. A flat record, as
+  [mmdbctl](https://github.com/ipinfo/mmdbctl) writes it, takes one key, also with a dot:
+  `city` or `country.iso_code`.
 - `default` is the value when the database has no value at the path. Without it, the variable is
   empty.
 - `source` is a variable that holds the address to look up. Without it, the module uses the

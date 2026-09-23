@@ -13,6 +13,7 @@
 # fixtures/a.mmdb and fixtures/b.mmdb map the same addresses to different
 # countries: 203.0.113.0/24 is DE in a and FR in b, 2001:db8::/32 is CH in a
 # and AT in b. a.mmdb also maps 192.0.2.0/24 to a record with every data type.
+# 198.18.0.0/15 has a flat record as mmdbctl writes it (upstream #113).
 # fixtures/v4.mmdb is an IPv4 only database. Regenerate them with
 # fixtures/generate.
 set -euo pipefail
@@ -24,6 +25,7 @@ IPV4=203.0.113.10
 IPV6=2001:db8::1
 TYPES=192.0.2.1
 UNKNOWN=198.51.100.1
+FLAT=198.18.0.1
 TYPE_VALUES="1 raw 1.50000 -2.25000 -9000000000000000000.00000 16 4000000000 -32 18446744073709551615 0x00000000000000010000000000000002 text first"
 FALLBACKS="MAP MISSING BADPATH RECORD"
 ESCAPED="%C5%8Cbu%20%26%20Co%2F%C3%BC~ text"
@@ -298,6 +300,8 @@ check "map, missing key, invalid path, no path get the default" "$FALLBACKS" \
   "$(http /fallback -H "X-IP: $TYPES")"
 check "escape=uri encodes all but unreserved characters" "$ESCAPED" \
   "$(http /escape -H "X-IP: $TYPES")"
+check "flat record: top level keys, also with a dot" "Amsterdam NL" \
+  "$(http /flat -H "X-IP: $FLAT")"
 check_match "metadata" '^[1-9][0-9]* [1-9][0-9]* [1-9][0-9]*$' "$(http /metadata)"
 check "client address" ZZ "$(http /client)"
 check "client address, path starts with a word of 8 letters" "[]" "$(http /location)"
@@ -323,6 +327,7 @@ check "every data type" "$TYPE_VALUES" "$(stream 9005 "$TYPES")"
 check "map, missing key, invalid path, no path get the default" "$FALLBACKS" \
   "$(stream 9006 "$TYPES")"
 check "escape=uri encodes all but unreserved characters" "$ESCAPED" "$(stream 9008 "$TYPES")"
+check "flat record: top level keys, also with a dot" "Amsterdam NL" "$(stream 9010 "$FLAT")"
 check_match "metadata" '^[1-9][0-9]* [1-9][0-9]* [1-9][0-9]*$' "$(stream 9007 "$IPV4")"
 check "client address" ZZ "$(stream 9001 "$IPV4")"
 check "client address, path starts with a word of 8 letters" "[]" "$(stream 9004 "$IPV4")"

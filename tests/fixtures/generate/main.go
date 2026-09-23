@@ -6,7 +6,9 @@
 // makes a stale cache after auto_reload visible.
 //
 // a.mmdb also maps 192.0.2.0/24 to a record with one value of every MMDB data
-// type. v4.mmdb is an IPv4 only database: an IPv6 lookup in it fails.
+// type, and 198.18.0.0/15 to a flat record as mmdbctl writes it: top level
+// keys, one of them with a dot. v4.mmdb is an IPv4 only database: an IPv6
+// lookup in it fails.
 package main
 
 import (
@@ -79,6 +81,10 @@ func write(path string, ipVersion int, networks [][2]string, extra int, withType
 	}
 	if withTypes {
 		insert(w, "192.0.2.0/24", types())
+		insert(w, "198.18.0.0/15", mmdbtype.Map{
+			"city":             mmdbtype.String("Amsterdam"),
+			"country.iso_code": mmdbtype.String("NL"),
+		})
 	}
 	for i := 0; i < extra; i++ {
 		ipnet := &net.IPNet{IP: net.IPv4(10, byte(i>>8), byte(i), 0).To4(), Mask: net.CIDRMask(24, 32)}
