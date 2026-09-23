@@ -1,3 +1,65 @@
+# ngx_http_geoip2_module (intechcore fork)
+
+[![CI](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml/badge.svg)](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml)
+[![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-orange.svg)](LICENSE)
+
+A maintained fork of [leev/ngx_http_geoip2_module](https://github.com/leev/ngx_http_geoip2_module).
+Upstream has had no commits since 2024-04. This fork adds:
+
+- Fixes for `auto_reload`, from upstream PR [#138](https://github.com/leev/ngx_http_geoip2_module/pull/138)
+  by Felipe Travi:
+  - After a reload the module returned the cached lookup result of the old, closed database
+    for the same client address ([#134](https://github.com/leev/ngx_http_geoip2_module/issues/134)).
+  - A new database file with an older mtime than the nginx start was never loaded. The
+    module now also checks the inode and the size.
+- Tests: lookups over IPv4 and IPv6, the default value, and both reload cases. See `tests/`.
+- Prebuilt module images for the official nginx images (Debian trixie), amd64 and arm64.
+
+The module code otherwise stays as in upstream. Fixes go back upstream where possible.
+
+## Prebuilt module image
+
+`ghcr.io/intechcore/ngx_http_geoip2_module:<nginx version>-<n>` holds only
+`/ngx_http_geoip2_module.so`, built for `nginx:<nginx version>-trixie`. `<n>` counts the builds
+for one nginx version. A dynamic module loads only into the nginx version it was built for.
+
+```dockerfile
+FROM nginx:1.31.6-trixie
+RUN apt-get update && apt-get install -y --no-install-recommends libmaxminddb0 \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6-1 \
+     /ngx_http_geoip2_module.so /usr/lib/nginx/modules/
+```
+
+Each image carries a build provenance attestation:
+
+```sh
+gh attestation verify oci://ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6-1 \
+  --owner intechcore
+```
+
+Only the http module is built. The stream module is in the sources but not in the image.
+
+## Build and test
+
+```sh
+make test            # build the module for NGINX_VERSION in the Dockerfile, run tests/run.sh
+make module          # build the module image
+make fixtures        # regenerate tests/fixtures/*.mmdb
+```
+
+Renovate bumps `NGINX_VERSION` when a new `nginx:<version>-trixie` image appears. CI builds
+and tests the module on native amd64 and arm64 runners. A merge to `master` publishes the
+module image for that nginx version.
+
+The build verifies the nginx source tarball against the release manager keys in `keys/`.
+A release signed by another key fails the build. Check the new key on
+https://nginx.org/en/pgp_keys.html, then add it.
+
+---
+
+The upstream README follows.
+
 Description
 ===========
 

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": false,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "nginx version the module is built for, from the official nginx image tags",
+      "managerFilePatterns": ["/^Dockerfile$/"],
+      "matchStrings": ["# renovate: nginx\\nARG NGINX_VERSION=(?<currentValue>[\\d.]+)"],
+      "depNameTemplate": "nginx",
+      "datasourceTemplate": "docker",
+      "extractVersionTemplate": "^(?<version>[\\d.]+)-trixie$"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "The dockerfile manager reads FROM nginx:${NGINX_VERSION}-trixie through the ARG default. The regex manager above owns that ARG, so this one stays off.",
+      "matchManagers": ["dockerfile"],
+      "matchDepNames": ["nginx"],
+      "enabled": false
+    },
+    {
+      "description": "The Go generator of the test databases is a dev tool. Update it by hand.",
+      "matchFileNames": ["tests/fixtures/generate/**"],
+      "enabled": false
+    }
+  ]
+}

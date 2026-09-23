@@ -1,0 +1,164 @@
+name: Publish
+
+# Publishes the module image ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n>
+# when a build input changes on master: the module sources, the Dockerfile
+# (for example a Renovate bump of NGINX_VERSION) or the nginx signing keys.
+# <n> counts the builds for one nginx version and starts at 1.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - config
+      - 'ngx_*.c'
+      - Dockerfile
+      - 'keys/**'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  # Each architecture is built, tested and pushed by digest on its own native
+  # runner. The module in the pushed image comes from the same build stage the
+  # tests ran against.
+  build:
+    name: build (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build the test image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: test
+          load: true
+          tags: geoip2:test
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+
+      - name: Run the tests
+        run: tests/run.sh geoip2:test
+
+      - name: Push the module image by digest
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: module
+          platforms: linux/${{ matrix.arch }}
+          provenance: false
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Save the digest
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          mkdir -p digests
+          touch "digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digest-${{ matrix.arch }}
+          path: digests/*
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: digests
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Choose the tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          nginx=$(awk -F= '/^ARG NGINX_VERSION=/ { print $2; exit }' Dockerfile)
+          # No package yet on the first run: the list stays empty.
+          existing=$(gh api "/orgs/${REPO%%/*}/packages/container/${REPO#*/}/versions" \
+            --paginate --jq '.[].metadata.container.tags[]' 2>/dev/null || true)
+          n=1
+          while grep -qx "${nginx}-${n}" <<<"$existing"; do
+            n=$((n + 1))
+          done
+          echo "nginx=$nginx" >> "$GITHUB_OUTPUT"
+          echo "tag=${nginx}-${n}" >> "$GITHUB_OUTPUT"
+          echo "Publishing ${nginx}-${n}"
+
+      - name: Create the multi-arch image
+        id: index
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          NGINX: ${{ steps.tag.outputs.nginx }}
+        working-directory: digests
+        run: |
+          # shellcheck disable=SC2046 # one argument per digest file
+          docker buildx imagetools create \
+            -t "${IMAGE}:${TAG}" -t "${IMAGE}:${NGINX}" \
+            $(printf "${IMAGE}@sha256:%s " *)
+          digest=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" \
+            --format '{{json .Manifest}}' | jq -r .digest)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Published"
+            echo "- \`${IMAGE}:${TAG}\`"
+            echo "- digest \`${digest}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.index.outputs.digest }}
+          push-to-registry: true
