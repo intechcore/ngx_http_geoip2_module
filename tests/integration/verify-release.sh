@@ -4,8 +4,8 @@
 #
 # 1. The files of the latest GitHub release: SHA256SUMS, LICENSE and the
 #    build provenance attestation of each module.
-# 2. Debian only: the attestation of the module image, and that its module
-#    equals the one in the release.
+# 2. Debian only: the attestation of the module image, and that its modules
+#    equal the ones in the release.
 # 3. A clean nginx:<version>-trixie or nginx:<version>-alpine image with the
 #    released modules passes tests/run.sh and tests/integration/run.sh.
 #
@@ -88,13 +88,17 @@ if [[ $OS == debian ]]; then
   docker pull -q "$IMAGE:$tag" >/dev/null
   # The image has no command. The container never runs, docker cp reads it.
   id=$(docker create "$IMAGE:$tag" none)
-  docker cp "$id:/ngx_http_geoip2_module.so" "$work/image.so" >/dev/null
+  for module in http stream; do
+    file="ngx_${module}_geoip2_module"
+    if ! docker cp "$id:/$file.so" "$work/image-$module.so" >/dev/null ||
+      [[ $(sha256 "$work/image-$module.so") != $(sha256 "$work/$file-$suffix.so") ]]; then
+      docker rm "$id" >/dev/null
+      echo "the image has no $file.so, or it differs from the release" >&2
+      exit 1
+    fi
+    echo "  ok   the image $module module equals the release module"
+  done
   docker rm "$id" >/dev/null
-  if [[ $(sha256 "$work/image.so") != $(sha256 "$work/ngx_http_geoip2_module-$suffix.so") ]]; then
-    echo "the image module differs from the release module" >&2
-    exit 1
-  fi
-  echo "  ok   the image module equals the release module"
 fi
 
 echo "clean $base with the released modules"

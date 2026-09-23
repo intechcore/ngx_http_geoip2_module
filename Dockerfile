@@ -2,7 +2,8 @@
 #
 # A dynamic module loads only into the nginx version it was built for, so the
 # build runs inside the official nginx image of that version. The final stage
-# is a scratch image that holds only the module. Consumers copy it:
+# is a scratch image that holds only the http and the stream module. Consumers
+# copy them:
 #
 #   COPY --from=ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n> \
 #        /ngx_http_geoip2_module.so /usr/lib/nginx/modules/
@@ -168,12 +169,12 @@ COPY --from=build-alpine /build/ngx_http_geoip2_module.so \
 
 FROM scratch AS module
 ARG NGINX_VERSION
-COPY --from=build /build/ngx_http_geoip2_module.so /ngx_http_geoip2_module.so
+COPY --from=build /build/ngx_http_geoip2_module.so /build/ngx_stream_geoip2_module.so /
 COPY LICENSE /LICENSE
 # Nothing runs in this image. It only carries files for COPY --from.
 USER 65534:65534
 LABEL org.opencontainers.image.title="ngx_http_geoip2_module" \
-      org.opencontainers.image.description="nginx GeoIP2 dynamic module for nginx ${NGINX_VERSION} (Debian trixie)" \
+      org.opencontainers.image.description="nginx GeoIP2 dynamic modules, http and stream, for nginx ${NGINX_VERSION} (Debian trixie)" \
       org.opencontainers.image.source="https://github.com/intechcore/ngx_http_geoip2_module" \
       org.opencontainers.image.licenses="BSD-2-Clause" \
       org.opencontainers.image.version="${NGINX_VERSION}"

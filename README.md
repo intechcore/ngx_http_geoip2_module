@@ -61,7 +61,7 @@ image). Renovate follows new nginx releases.
 
 | Source | Modules | Loads into | Needs |
 |---|---|---|---|
-| Image `ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n>` | http | `nginx:<nginx>-trixie` | `libmaxminddb0` |
+| Image `ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n>` | http, stream | `nginx:<nginx>-trixie` | `libmaxminddb0` |
 | Release file `*-<nginx>-<arch>.so` | http, stream | `nginx:<nginx>-trixie`, nginx.org packages for trixie | `libmaxminddb0` |
 | Release file `*-<nginx>-alpine-<arch>.so` | http, stream | `nginx:<nginx>-alpine` | `libmaxminddb-libs` |
 
@@ -73,15 +73,15 @@ name. A release holds the http and the stream module for amd64 and arm64, `SHA25
 
 ### Docker image
 
-The image holds only `/ngx_http_geoip2_module.so`. Copy it into the nginx image of the same
-version, here mainline:
+The image holds only `/ngx_http_geoip2_module.so` and `/ngx_stream_geoip2_module.so`. Copy the
+modules you need into the nginx image of the same version, here mainline:
 
 ```dockerfile
 FROM nginx:1.31.6-trixie
 RUN apt-get update && apt-get install -y --no-install-recommends libmaxminddb0 \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6 \
-     /ngx_http_geoip2_module.so /usr/lib/nginx/modules/
+     /ngx_http_geoip2_module.so /ngx_stream_geoip2_module.so /usr/lib/nginx/modules/
 ```
 
 For stable, use `nginx:1.30.5-trixie` and `ngx_http_geoip2_module:1.30.5`.
@@ -367,7 +367,7 @@ coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocat
 |---|---|
 | A pull request | CI builds both modules and runs `tests/run.sh` for nginx mainline and stable, on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the shell scripts, Hadolint checks the `Dockerfile`. A sanitizer build runs the tests too, and the integration tests run on Debian, Alpine and the sanitizer build. SonarCloud and CodeQL analyze the code. |
 | A merge to `master` that changes `config`, `ngx_*.c`, `ngx_*.h`, `Dockerfile` or `keys/` | The publish workflow runs the tests again. It then pushes the image `<nginx>-<n>` and creates the GitHub release with the same tag, for mainline and stable. A merge that only bumps the version of one branch publishes only that branch. The build is reproducible: if the modules equal the last release of that nginx version, nothing is published. |
-| A publish, and once a week | The verify workflow takes the latest release and image of each nginx branch as a user does. It checks `SHA256SUMS`, `LICENSE` and the attestations, and that the image holds the release module. It then runs `tests/run.sh` and the integration tests on a clean `nginx:<version>-trixie` and `nginx:<version>-alpine` image with the released modules, on amd64 and arm64. |
+| A publish, and once a week | The verify workflow takes the latest release and image of each nginx branch as a user does. It checks `SHA256SUMS`, `LICENSE` and the attestations, and that the image holds the release modules. It then runs `tests/run.sh` and the integration tests on a clean `nginx:<version>-trixie` and `nginx:<version>-alpine` image with the released modules, on amd64 and arm64. |
 | A new `nginx:<version>-trixie` image | Renovate opens a pull request that sets the new version in the `Dockerfile` (`NGINX_MAINLINE` or `NGINX_STABLE`) and in the README examples. Its merge publishes the modules for that nginx version. |
 
 The image and the release files carry a build provenance attestation.
