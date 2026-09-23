@@ -14,6 +14,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
 	"math/big"
 	"net"
 	"os"
@@ -39,6 +40,10 @@ func types() mmdbtype.Map {
 			"bytes":  mmdbtype.Bytes("raw"),
 			"float":  mmdbtype.Float32(1.5),
 			"double": mmdbtype.Float64(-2.25),
+			// Beyond the int64 range, NaN and infinity: not found.
+			"double_huge": mmdbtype.Float64(1e300),
+			"double_nan":  mmdbtype.Float64(math.NaN()),
+			"float_inf":   mmdbtype.Float32(float32(math.Inf(1))),
 			// The longest double nginx prints: its integer part is an int64.
 			"double_big": mmdbtype.Float64(-9e18),
 			"uint16":     mmdbtype.Uint16(16),

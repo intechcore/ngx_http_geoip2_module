@@ -27,7 +27,7 @@ TYPES=192.0.2.1
 UNKNOWN=198.51.100.1
 FLAT=198.18.0.1
 TYPE_VALUES="1 raw 1.50000 -2.25000 -9000000000000000000.00000 16 4000000000 -32 18446744073709551615 0x00000000000000010000000000000002 text first"
-FALLBACKS="MAP MISSING BADPATH RECORD"
+FALLBACKS="MAP MISSING BADPATH RECORD HUGE NAN INF"
 ESCAPED="%C5%8Cbu%20%26%20Co%2F%C3%BC~ text"
 
 read -r -a EXTRA_ARGS <<<"${DOCKER_RUN_ARGS:-}"
@@ -195,7 +195,7 @@ check "IPv4 address in an IPv4 database" SE "$(http /v4 -H "X-IP: $IPV4")"
 check "IPv6 address in an IPv4 database gets the default" FAIL "$(http /v4 -H "X-IP: $IPV6")"
 check "same IPv6 address again (cached failure)" FAIL "$(http /v4 -H "X-IP: $IPV6")"
 check "every data type" "$TYPE_VALUES" "$(http /types -H "X-IP: $TYPES")"
-check "map, missing key, invalid path, no path get the default" "$FALLBACKS" \
+check "map, missing key, invalid path, no path, float out of range get the default" "$FALLBACKS" \
   "$(http /fallback -H "X-IP: $TYPES")"
 check "escape=uri encodes all but unreserved characters" "$ESCAPED" \
   "$(http /escape -H "X-IP: $TYPES")"
@@ -223,7 +223,7 @@ check "address not in the database, no default" "[]" "$(stream 9002 "$UNKNOWN")"
 check "IPv4 address in an IPv4 database" SE "$(stream 9003 "$IPV4")"
 check "IPv6 address in an IPv4 database gets the default" FAIL "$(stream 9003 "$IPV6")"
 check "every data type" "$TYPE_VALUES" "$(stream 9005 "$TYPES")"
-check "map, missing key, invalid path, no path get the default" "$FALLBACKS" \
+check "map, missing key, invalid path, no path, float out of range get the default" "$FALLBACKS" \
   "$(stream 9006 "$TYPES")"
 check "escape=uri encodes all but unreserved characters" "$ESCAPED" "$(stream 9008 "$TYPES")"
 check "flat record: top level keys, also with a dot" "Amsterdam NL" "$(stream 9010 "$FLAT")"

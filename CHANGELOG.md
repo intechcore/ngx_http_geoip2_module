@@ -5,6 +5,8 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
 ## [Unreleased]
 
 ### Fixed
+- A float or double beyond the int64 range, NaN or infinity made nginx print undefined digits.
+  The lookup now treats such a value as not found.
 - A heap overflow in both modules: a uint128 value (34 characters) or a double with 14 or
   more integer digits went into a buffer of 20 bytes. The buffer now holds 64 bytes, and
   the write is bounded.

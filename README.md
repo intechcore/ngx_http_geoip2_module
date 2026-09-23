@@ -216,7 +216,7 @@ The value of each data type:
 | utf8_string, bytes | the content |
 | boolean | `1` or `0` |
 | uint16, uint32, int32, uint64 | the decimal number |
-| float, double | the number with 5 decimals, for example `1.50000` |
+| float, double | the number with 5 decimals, for example `1.50000`; beyond ±9.2·10¹⁸, NaN or infinity: not found |
 | uint128 | hex with `0x` and 32 digits |
 | map, array | not found: the default value, or empty |
 
