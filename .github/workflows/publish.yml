@@ -6,7 +6,8 @@ name: Publish
 # Dockerfile (for example a Renovate bump of an nginx version) or the nginx
 # signing keys. <n> counts the builds for one nginx version and starts at 1.
 # The release holds the http and the stream module for amd64 and arm64, built
-# for the Debian and the Alpine nginx image.
+# for the Debian and the Alpine nginx image. The build is reproducible: if the
+# modules equal the last release of that nginx version, nothing is published.
 
 on:
   push:
@@ -23,6 +24,10 @@ on:
         type: choice
         options: [both, mainline, stable]
         default: both
+      force:
+        description: publish even if the modules equal the last release
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -236,9 +241,40 @@ jobs:
           merge-multiple: true
           path: binaries
 
+      - name: Write the checksums
+        working-directory: binaries
+        run: sha256sum -- *.so > SHA256SUMS
+
+      # The image holds the same http module as the release, so equal checksums
+      # mean an equal image too.
+      - name: Compare with the last release
+        id: compare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ matrix.nginx }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          nginx=$(scripts/nginx-version.sh "$BRANCH")
+          last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
+            --json tagName --jq '.[].tagName' |
+            grep -E "^${nginx//./\\.}-[0-9]+$" | sort -t- -k2 -n | tail -1 || true)
+          changed=true
+          if [[ $FORCE != true && -n $last ]] &&
+            gh release download "$last" --repo "$GITHUB_REPOSITORY" \
+              --pattern SHA256SUMS --output last.sums &&
+            cmp -s last.sums binaries/SHA256SUMS; then
+            changed=false
+            echo "## ${BRANCH}: unchanged" >> "$GITHUB_STEP_SUMMARY"
+            echo "The modules equal the release ${last}. Nothing is published." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "Last release ${last:-none}, changed: $changed"
+
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: steps.compare.outputs.changed == 'true'
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: steps.compare.outputs.changed == 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -246,6 +282,7 @@ jobs:
 
       - name: Choose the tag
         id: tag
+        if: steps.compare.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -265,6 +302,7 @@ jobs:
 
       - name: Create the multi-arch image
         id: index
+        if: steps.compare.outputs.changed == 'true'
         env:
           TAG: ${{ steps.tag.outputs.tag }}
           NGINX: ${{ steps.tag.outputs.nginx }}
@@ -285,20 +323,19 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        if: steps.compare.outputs.changed == 'true'
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.index.outputs.digest }}
           push-to-registry: true
 
-      - name: Write the checksums
-        working-directory: binaries
-        run: sha256sum -- *.so > SHA256SUMS
-
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        if: steps.compare.outputs.changed == 'true'
         with:
           subject-path: binaries/*.so
 
       - name: Create the release
+        if: steps.compare.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.tag.outputs.tag }}
