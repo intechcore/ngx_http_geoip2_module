@@ -14,7 +14,7 @@ if [ $ngx_found = yes ]; then
 			ngx_module_type=HTTP
 			ngx_module_name="ngx_http_geoip2_module"
 			ngx_module_incs=
-			ngx_module_deps=
+			ngx_module_deps="$ngx_addon_dir/ngx_geoip2_common.h"
 			ngx_module_srcs="$ngx_addon_dir/ngx_http_geoip2_module.c"
 			ngx_module_libs="$ngx_feature_libs"
 			. auto/module
@@ -25,7 +25,7 @@ if [ $ngx_found = yes ]; then
 			ngx_module_type=STREAM
 			ngx_module_name="ngx_stream_geoip2_module"
 			ngx_module_incs=
-			ngx_module_deps=
+			ngx_module_deps="$ngx_addon_dir/ngx_geoip2_common.h"
 			ngx_module_srcs="$ngx_addon_dir/ngx_stream_geoip2_module.c"
 			ngx_module_libs="$ngx_feature_libs"
 			. auto/module
@@ -33,6 +33,7 @@ if [ $ngx_found = yes ]; then
 	else
 		HTTP_MODULES="$HTTP_MODULES ngx_http_geoip2_module"
 		NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_geoip2_module.c"
+		NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_addon_dir/ngx_geoip2_common.h"
 		CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
 	fi
 else   

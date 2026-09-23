@@ -12,6 +12,9 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
   without arguments read past them as well. Both modules.
 
 ### Changed
+- The http and the stream module share their database code in `ngx_geoip2_common.h`:
+  opening, lookups with the cache, value formatting, variable arguments, metadata and
+  `auto_reload`. A fix there applies to both modules.
 - A `$var metadata` directive with an unknown field or a wrong number of arguments is now a
   configuration error. Before, the variable was empty at run time, and a field matched by
   its prefix only: `build_epochs` gave the build epoch.
