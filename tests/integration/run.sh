@@ -6,10 +6,15 @@
 # databases.
 #
 #   tests/integration/run.sh <test image>     build it with: docker build --target test -t <image> .
+#
+# LOAD_SECONDS and LOAD_CLIENTS set the length and the parallel clients of
+# the load test, 10 s and 4 by default.
 set -euo pipefail
 
 IMAGE=${1:?usage: tests/integration/run.sh <test image>}
 HERE="$(cd "$(dirname "$0")" && pwd)"
+LOAD_SECONDS=${LOAD_SECONDS:-10}
+LOAD_CLIENTS=${LOAD_CLIENTS:-4}
 
 # shellcheck source=tests/lib.sh
 . "$HERE/../lib.sh"
@@ -23,11 +28,14 @@ trap 'cleanup; [[ -n ${KEEP:-} ]] || compose down --timeout 5 >/dev/null 2>&1 ||
 
 "$HERE/databases.sh"
 
-# start <configuration in tests/integration>
+# start <configuration in tests/integration>: start nginx with the MaxMind
+# databases in /databases, and tests/fixtures/a.mmdb as /data/current.mmdb.
 start() {
   cleanup
   container=$(docker run -d -v "$HERE/databases:/databases:ro" -v "$HERE:/integration:ro" \
-    --entrypoint nginx "$IMAGE" -c "/integration/$1" -g "daemon off;")
+    -v "$HERE/../fixtures:/fixtures:ro" --entrypoint sh "$IMAGE" \
+    -c 'mkdir -p /data && cp /fixtures/a.mmdb /data/current.mmdb &&
+        exec nginx -c "/integration/$0" -g "daemon off;"' "$1")
   wait_for_nginx
 }
 
@@ -66,6 +74,55 @@ check "Linköping: non-ASCII name, ASN" "SE|Linköping|29518" "$(stream 9000 89.
 check "San Diego: IPv6" "US|San Diego|-" "$(stream 9000 2001:480::1)"
 check "AT&T: only in the ASN database" "-|-|7018" "$(stream 9000 12.81.92.1)"
 no_crash "MaxMind test databases"
+
+# swap <a|b>: replace /data/current.mmdb with that fixture, atomically.
+swap() {
+  docker exec "$container" sh -c \
+    "cp /fixtures/$1.mmdb /data/new.mmdb && mv /data/new.mmdb /data/current.mmdb"
+}
+
+# replies <http|stream>: the replies load.sh got, one per line.
+replies() {
+  docker exec "$container" cat "/tmp/$1.replies"
+}
+
+echo "load and reload: $LOAD_SECONDS s, $LOAD_CLIENTS http and $LOAD_CLIENTS stream clients"
+start load.conf
+docker exec "$container" /integration/load.sh "$LOAD_SECONDS" "$LOAD_CLIENTS" &
+load=$!
+swaps=0
+next=b
+end=$((SECONDS + LOAD_SECONDS - 1))
+while ((SECONDS < end)); do
+  sleep 1
+  swap "$next"
+  swaps=$((swaps + 1))
+  last=$next
+  if [[ $next == b ]]; then next=a; else next=b; fi
+  if ((swaps % 3 == 0)); then
+    docker exec "$container" nginx -c /integration/load.conf -s reload 2>/dev/null
+  fi
+done
+wait "$load"
+for kind in http stream; do
+  out=$(replies "$kind")
+  total=$(grep -c . <<<"$out" || true)
+  echo "  $kind: $total replies, $swaps swaps, $((swaps / 3)) reloads"
+  check "$kind: every reply is DE or FR" "" "$(grep -vxE 'DE|FR' <<<"$out" | sort -u | head -3)"
+  check_match "$kind: replies from both databases" '^[1-9][0-9]* [1-9][0-9]*$' \
+    "$(grep -cx DE <<<"$out" || true) $(grep -cx FR <<<"$out" || true)"
+done
+check_match "auto_reload loaded the swapped database" '^[1-9][0-9]*$' \
+  "$(docker exec "$container" grep -c 'Reload MMDB "/data/current.mmdb"' /tmp/info.log || true)"
+# New workers open the database at start: after a reload, every worker has
+# the last swapped file.
+docker exec "$container" nginx -c /integration/load.conf -s reload 2>/dev/null
+sleep 1
+expected=DE
+if [[ $last == b ]]; then expected=FR; fi
+check "http: the last database after a reload" "$expected" "$(http / -H 'X-IP: 203.0.113.10')"
+check "stream: the last database after a reload" "$expected" "$(stream 9000 203.0.113.10)"
+no_crash "load and reload"
 
 # client <shell command>: run it in the client container, the output without
 # the newline.
