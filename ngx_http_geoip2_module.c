@@ -151,36 +151,10 @@ ngx_http_geoip2_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
     rc = ngx_geoip2_lookup(r->pool, geoip2->database, addr.sockaddr,
                            geoip2->lookup, geoip2->escape, &val);
 
-    if (rc == NGX_ERROR) {  /* GCOVR_EXCL_BR_LINE */
-        return NGX_ERROR;  /* GCOVR_EXCL_LINE */
-    }
-
-    if (rc == NGX_DECLINED) {
-        goto not_found;
-    }
-
-    v->data = val.data;
-    v->len = val.len;
-
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
-    return NGX_OK;
+    return ngx_geoip2_value(v, rc, &val, &geoip2->default_value);
 
 not_found:
-    if (geoip2->default_value.len > 0) {
-        v->data = geoip2->default_value.data;
-        v->len = geoip2->default_value.len;
-
-        v->valid = 1;
-        v->no_cacheable = 0;
-        v->not_found = 0;
-    } else {
-        v->not_found = 1;
-    }
-
-    return NGX_OK;
+    return ngx_geoip2_value(v, NGX_DECLINED, NULL, &geoip2->default_value);
 }
 
 
@@ -193,18 +167,9 @@ ngx_http_geoip2_metadata(ngx_http_request_t *r, ngx_http_variable_value_t *v,
 
     rc = ngx_geoip2_metadata_value(r->pool, (ngx_geoip2_metadata_t *) data,
                                    &val);
-    if (rc != NGX_OK) {  /* GCOVR_EXCL_BR_LINE */
-        return NGX_ERROR;  /* GCOVR_EXCL_LINE */
-    }
 
-    v->data = val.data;
-    v->len = val.len;
-
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
-    return NGX_OK;
+    /* metadata has no default: its value is never declined */
+    return ngx_geoip2_value(v, rc, &val, NULL);
 }
 
 

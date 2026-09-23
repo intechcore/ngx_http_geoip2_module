@@ -519,6 +519,40 @@ ngx_geoip2_metadata_value(ngx_pool_t *pool, ngx_geoip2_metadata_t *metadata,
 
 
 /*
+ * Sets the variable from a result: the value for NGX_OK; for NGX_DECLINED the
+ * default value, or not found without one. NGX_ERROR passes through. The http
+ * and the stream variable value types are both ngx_variable_value_t. A caller
+ * that never declines may pass no default value.
+ */
+static ngx_int_t
+ngx_geoip2_value(ngx_variable_value_t *v, ngx_int_t rc, ngx_str_t *value,
+    ngx_str_t *default_value)
+{
+    if (rc == NGX_ERROR) {  /* GCOVR_EXCL_BR_LINE */
+        return NGX_ERROR;  /* GCOVR_EXCL_LINE */
+    }
+
+    if (rc == NGX_DECLINED) {
+        if (default_value->len == 0) {
+            v->not_found = 1;
+            return NGX_OK;
+        }
+
+        value = default_value;
+    }
+
+    v->data = value->data;
+    v->len = value->len;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+/*
  * Reloads each database whose auto_reload interval has passed and whose file
  * has changed: a newer mtime, another inode or another size.
  */
