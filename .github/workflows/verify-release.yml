@@ -3,8 +3,8 @@ name: Verify release
 # Verifies the published artifacts the way users take them: the latest
 # release and image of each nginx branch, on Debian and Alpine, amd64 and
 # arm64 (tests/integration/verify-release.sh). It runs after each publish,
-# once a week, by hand, and for a pull request that changes the check. A
-# failure means users get a broken artifact.
+# once a week and by hand. A failure means users get a broken artifact. The
+# test jobs of ci.yml verify what a branch would publish.
 
 on:
   workflow_run:
@@ -14,10 +14,6 @@ on:
   schedule:
     - cron: '23 5 * * 1'
   workflow_dispatch:
-  pull_request:
-    paths:
-      - tests/integration/verify-release.sh
-      - .github/workflows/verify-release.yml
 
 permissions:
   contents: read
