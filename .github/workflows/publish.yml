@@ -190,17 +190,17 @@ jobs:
           cache-from: type=gha,scope=${{ env.ALPINE_SCOPE }}
           outputs: type=local,dest=binaries-alpine
 
-      - name: Name the binaries by nginx version and architecture
+      # The publish job puts the release tag in front once it knows it.
+      - name: Name the binaries by system and architecture
         env:
           ARCH: ${{ matrix.arch }}
-          NGINX: ${{ steps.nginx.outputs.version }}
         run: |
           for f in binaries/*.so; do
-            mv "$f" "${f%.so}-${NGINX}-${ARCH}.so"
+            mv "$f" "${f%.so}-debian-${ARCH}.so"
           done
           for f in binaries-alpine/*.so; do
             base=${f#binaries-alpine/}
-            mv "$f" "binaries/${base%.so}-${NGINX}-alpine-${ARCH}.so"
+            mv "$f" "binaries/${base%.so}-alpine-${ARCH}.so"
           done
           ls -l binaries
 
@@ -246,8 +246,9 @@ jobs:
         run: sha256sum -- *.so > SHA256SUMS
 
       # The image holds the same modules as the release, so equal checksums
-      # mean an equal image too. A change of the image layout alone needs
-      # workflow_dispatch with force.
+      # mean an equal image too. Only the checksums count, not the file names.
+      # A change of the image layout alone needs workflow_dispatch with force.
+      # The next tag is the last release number plus one.
       - name: Compare with the last release
         id: compare
         env:
@@ -256,20 +257,24 @@ jobs:
           FORCE: ${{ inputs.force }}
         run: |
           nginx=$(scripts/nginx-version.sh "$BRANCH")
-          last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
-            --json tagName --jq '.[].tagName' |
-            grep -E "^${nginx//./\\.}-[0-9]+$" | sort -t- -k2 -n | tail -1 || true)
+          last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 \
+            --json tagName --jq '.[].tagName' | sed -n "s/^${nginx}-//p" | sort -n | tail -1)
           changed=true
           if [[ $FORCE != true && -n $last ]] &&
-            gh release download "$last" --repo "$GITHUB_REPOSITORY" \
-              --pattern SHA256SUMS --output last.sums &&
-            cmp -s last.sums binaries/SHA256SUMS; then
+            gh release download "$nginx-$last" --repo "$GITHUB_REPOSITORY" \
+              --pattern SHA256SUMS --output last.sums --clobber &&
+            [[ $(cut -d' ' -f1 last.sums | sort) == $(cut -d' ' -f1 binaries/SHA256SUMS | sort) ]]; then
             changed=false
             echo "## ${BRANCH}: unchanged" >> "$GITHUB_STEP_SUMMARY"
-            echo "The modules equal the release ${last}. Nothing is published." >> "$GITHUB_STEP_SUMMARY"
+            echo "The modules equal the release $nginx-$last. Nothing is published." >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
-          echo "Last release ${last:-none}, changed: $changed"
+          tag="$nginx-$(( ${last:-0} + 1 ))"
+          {
+            echo "changed=$changed"
+            echo "nginx=$nginx"
+            echo "tag=$tag"
+          } >> "$GITHUB_OUTPUT"
+          echo "Last release $nginx-${last:-none}, changed: $changed, next: $tag"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         if: steps.compare.outputs.changed == 'true'
@@ -281,32 +286,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Choose the tag
-        id: tag
+      - name: Put the release tag in the file names
         if: steps.compare.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          BRANCH: ${{ matrix.nginx }}
+          TAG: ${{ steps.compare.outputs.tag }}
+        working-directory: binaries
         run: |
-          nginx=$(scripts/nginx-version.sh "$BRANCH")
-          # No package yet on the first run: the list stays empty.
-          existing=$(gh api "/orgs/${REPO%%/*}/packages/container/${REPO#*/}/versions" \
-            --paginate --jq '.[].metadata.container.tags[]' 2>/dev/null || true)
-          n=1
-          while grep -qx "${nginx}-${n}" <<<"$existing"; do
-            n=$((n + 1))
+          for f in *.so; do
+            mv "$f" "${f/_module-/_module-$TAG-}"
           done
-          echo "nginx=$nginx" >> "$GITHUB_OUTPUT"
-          echo "tag=${nginx}-${n}" >> "$GITHUB_OUTPUT"
-          echo "Publishing ${nginx}-${n}"
+          sha256sum -- *.so > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Create the multi-arch image
         id: index
         if: steps.compare.outputs.changed == 'true'
         env:
-          TAG: ${{ steps.tag.outputs.tag }}
-          NGINX: ${{ steps.tag.outputs.nginx }}
+          TAG: ${{ steps.compare.outputs.tag }}
+          NGINX: ${{ steps.compare.outputs.nginx }}
           BRANCH: ${{ matrix.nginx }}
         working-directory: digests
         run: |
@@ -339,8 +336,8 @@ jobs:
         if: steps.compare.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.tag.outputs.tag }}
-          NGINX: ${{ steps.tag.outputs.nginx }}
+          TAG: ${{ steps.compare.outputs.tag }}
+          NGINX: ${{ steps.compare.outputs.nginx }}
           BRANCH: ${{ matrix.nginx }}
         run: |
           cat > notes.md <<EOF
@@ -351,8 +348,8 @@ jobs:
 
           | Files | Built on | Loads into | Needs |
           |---|---|---|---|
-          | \`*-${NGINX}-<arch>.so\` | Debian trixie (glibc) | \`nginx:${NGINX}-trixie\`, nginx.org packages for trixie | \`libmaxminddb0\` |
-          | \`*-${NGINX}-alpine-<arch>.so\` | Alpine (musl) | \`nginx:${NGINX}-alpine\` | \`libmaxminddb-libs\` |
+          | \`*-${TAG}-debian-<arch>.so\` | Debian trixie (glibc) | \`nginx:${NGINX}-trixie\`, nginx.org packages for trixie | \`libmaxminddb0\` |
+          | \`*-${TAG}-alpine-<arch>.so\` | Alpine (musl) | \`nginx:${NGINX}-alpine\` | \`libmaxminddb-libs\` |
 
           The same Debian modules are in the image \`${IMAGE}:${TAG}\`.
 
@@ -360,7 +357,7 @@ jobs:
 
           \`\`\`sh
           sha256sum --check --ignore-missing SHA256SUMS
-          gh attestation verify ngx_http_geoip2_module-${NGINX}-amd64.so --owner intechcore
+          gh attestation verify ngx_http_geoip2_module-${TAG}-debian-amd64.so --owner intechcore
           \`\`\`
           EOF
           # The latest release is the mainline one. gh release download takes it

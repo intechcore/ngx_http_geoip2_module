@@ -62,8 +62,8 @@ image). Renovate follows new nginx releases.
 | Source | Modules | Loads into | Needs |
 |---|---|---|---|
 | Image `ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n>` | http, stream | `nginx:<nginx>-trixie` | `libmaxminddb0` |
-| Release file `*-<nginx>-<arch>.so` | http, stream | `nginx:<nginx>-trixie`, nginx.org packages for trixie | `libmaxminddb0` |
-| Release file `*-<nginx>-alpine-<arch>.so` | http, stream | `nginx:<nginx>-alpine` | `libmaxminddb-libs` |
+| Release file `*-<nginx>-<n>-debian-<arch>.so` | http, stream | `nginx:<nginx>-trixie`, nginx.org packages for trixie | `libmaxminddb0` |
+| Release file `*-<nginx>-<n>-alpine-<arch>.so` | http, stream | `nginx:<nginx>-alpine` | `libmaxminddb-libs` |
 
 `<n>` counts the builds for one nginx version. The image tag `<nginx>` points to the latest
 build for that nginx version. Each `<nginx>-<n>` tag has a
@@ -98,15 +98,15 @@ gh attestation verify oci://ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6 \
 ### Release binaries
 
 Download a module from the latest release, check it and install it. For stable or another
-nginx version, pass the release tag to `gh release download`. For Alpine, use the `-alpine-`
-files.
+nginx version, pass the release tag to `gh release download`. For Alpine, use `alpine` in place
+of `debian`.
 
 ```sh
 gh release download --repo intechcore/ngx_http_geoip2_module \
-  --pattern 'ngx_http_geoip2_module-*-amd64.so' --pattern SHA256SUMS
+  --pattern 'ngx_http_geoip2_module-*-debian-amd64.so' --pattern SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
-gh attestation verify ngx_http_geoip2_module-*-amd64.so --owner intechcore
-sudo install -m 644 ngx_http_geoip2_module-*-amd64.so \
+gh attestation verify ngx_http_geoip2_module-*-debian-amd64.so --owner intechcore
+sudo install -m 644 ngx_http_geoip2_module-*-debian-amd64.so \
   /usr/lib/nginx/modules/ngx_http_geoip2_module.so
 ```
 
