@@ -349,6 +349,9 @@ check_match "stream: last_change is the mtime of the new database" ' 1577836800$
   "$(stream 9007 "$IPV4")"
 no_crash "reload with an old mtime"
 
+# Only to check that the size triggers the reload. Overwriting a loaded file
+# is unsafe (see "Updating a database" in the README); no lookup runs until
+# the reload.
 echo "auto_reload, database changed in place with an old mtime"
 start
 docker exec "$container" sh -c \
