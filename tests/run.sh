@@ -304,8 +304,10 @@ check "map, missing key, invalid path, no path get the default" "$FALLBACKS" \
 check_match "metadata" '^[1-9][0-9]* [1-9][0-9]* [1-9][0-9]*$' "$(stream 9007 "$IPV4")"
 check "client address" ZZ "$(stream 9001 "$IPV4")"
 check "client address, path starts with a word of 8 letters" "[]" "$(stream 9004 "$IPV4")"
+# telnet:// sends nothing. Unread request data would make nginx reset the
+# connection, and the reset can overtake the reply.
 check "unix socket client gets the default" ZZ \
-  "$(docker exec "$container" curl -sS --http0.9 --unix-socket /tmp/stream.sock http://localhost/ 2>/dev/null | tr -d '\n')"
+  "$(docker exec "$container" curl -sS --unix-socket /tmp/stream.sock telnet://localhost </dev/null | tr -d '\n')"
 no_crash "stream lookups"
 
 echo "auto_reload, new database with a new mtime (#134)"
