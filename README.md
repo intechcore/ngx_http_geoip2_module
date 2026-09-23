@@ -347,6 +347,11 @@ behind a CDN, a load balancer, nginx with the modules and an upstream applicatio
 check the headers the application gets, `geoip2_proxy` with a recursive `X-Forwarded-For`, the
 stream realip module with PROXY protocol, and that an untrusted client cannot spoof its address.
 
+A load test sends about 300 000 http and stream requests in 10 seconds from parallel clients,
+while the database is replaced with `mv` each second and nginx reloads every third time. Every
+reply must come from one of the two databases, and no worker may crash. With the cache fix of
+upstream #134 taken out, this test fails.
+
 `make asan` runs the same tests on nginx and both modules built with sanitizers. Each pool
 allocation of nginx is its own `malloc` there, so AddressSanitizer also finds an overflow inside
 a pool block. A sanitizer report fails the tests.
