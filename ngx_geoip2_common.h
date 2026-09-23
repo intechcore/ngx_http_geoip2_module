@@ -2,6 +2,9 @@
  * Copyright (C) Lee Valentine <lee@leev.net>
  * Copyright (C) Andrei Belov <defanator@gmail.com>
  *
+ * Based on nginx's 'ngx_http_geoip_module.c' and 'ngx_stream_geoip_module.c'
+ * by Igor Sysoev
+ *
  * The database code of the http and the stream module. Every function is
  * static, so each module holds its own copy and no symbols clash.
  */
