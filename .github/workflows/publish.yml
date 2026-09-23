@@ -4,10 +4,10 @@ name: Publish
 # and a GitHub release with the same tag, for the mainline and the stable nginx
 # branch. It runs when a build input changes on master: the module sources, the
 # Dockerfile (for example a Renovate bump of an nginx version) or the nginx
-# signing keys. <n> counts the builds for one nginx version and starts at 1.
-# The release holds the http and the stream module for amd64 and arm64, built
-# for the Debian and the Alpine nginx image. The build is reproducible: if the
-# modules equal the last release of that nginx version, nothing is published.
+# signing keys. <n> counts the builds for one nginx version. The release holds
+# the http and the stream module for amd64 and arm64, built for the Debian and
+# the Alpine nginx image. The build is reproducible: a branch whose modules
+# equal its last release is not published again.
 
 on:
   push:
@@ -19,11 +19,6 @@ on:
       - 'keys/**'
   workflow_dispatch:
     inputs:
-      nginx:
-        description: nginx branch to publish
-        type: choice
-        options: [both, mainline, stable]
-        default: both
       force:
         description: publish even if the modules equal the last release
         type: boolean
@@ -39,52 +34,11 @@ env:
   IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  # A push that only bumps the version of one nginx branch publishes only that
-  # branch. Any other change of a build input publishes both.
-  branches:
-    runs-on: ubuntu-26.04
-    permissions:
-      contents: read
-    outputs:
-      list: ${{ steps.select.outputs.list }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Select the nginx branches
-        id: select
-        env:
-          EVENT: ${{ github.event_name }}
-          INPUT: ${{ inputs.nginx }}
-          BEFORE: ${{ github.event.before }}
-        run: |
-          list='["mainline","stable"]'
-          if [[ $EVENT == workflow_dispatch && $INPUT != both ]]; then
-            list="[\"$INPUT\"]"
-          elif [[ $EVENT == push ]] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            inputs=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- \
-              config 'ngx_*.[ch]' Dockerfile keys)
-            changes=$(git diff -U0 "$BEFORE" "$GITHUB_SHA" -- Dockerfile |
-              grep -E '^[-+]' | grep -Ev '^(\+\+\+|---) ' || true)
-            if [[ $inputs == Dockerfile ]] &&
-              ! grep -Evq '^[-+]ARG NGINX_(MAINLINE|STABLE)=' <<<"$changes"; then
-              branches=()
-              grep -q NGINX_MAINLINE <<<"$changes" && branches+=('"mainline"')
-              grep -q NGINX_STABLE <<<"$changes" && branches+=('"stable"')
-              list="[$(IFS=,; echo "${branches[*]}")]"
-            fi
-          fi
-          echo "list=$list" >> "$GITHUB_OUTPUT"
-          echo "Publishing $list"
-
   # Each nginx branch and architecture is built, tested and pushed by digest on
   # its own native runner. The module in the pushed image comes from the same
   # build stage the tests ran against.
   build:
     name: build (${{ matrix.nginx }} ${{ matrix.arch }})
-    needs: branches
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     permissions:
       contents: read
@@ -92,7 +46,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        nginx: ${{ fromJSON(needs.branches.outputs.list) }}
+        nginx: [mainline, stable]
         arch: [amd64, arm64]
     env:
       # The same cache scopes as the test jobs in ci.yml.
@@ -190,17 +144,17 @@ jobs:
           cache-from: type=gha,scope=${{ env.ALPINE_SCOPE }}
           outputs: type=local,dest=binaries-alpine
 
-      - name: Name the binaries by nginx version and architecture
+      # The publish job puts the release tag in front once it knows it.
+      - name: Name the binaries by system and architecture
         env:
           ARCH: ${{ matrix.arch }}
-          NGINX: ${{ steps.nginx.outputs.version }}
         run: |
           for f in binaries/*.so; do
-            mv "$f" "${f%.so}-${NGINX}-${ARCH}.so"
+            mv "$f" "${f%.so}-debian-${ARCH}.so"
           done
           for f in binaries-alpine/*.so; do
             base=${f#binaries-alpine/}
-            mv "$f" "binaries/${base%.so}-${NGINX}-alpine-${ARCH}.so"
+            mv "$f" "binaries/${base%.so}-alpine-${ARCH}.so"
           done
           ls -l binaries
 
@@ -212,7 +166,7 @@ jobs:
 
   publish:
     name: publish (${{ matrix.nginx }})
-    needs: [branches, build]
+    needs: build
     runs-on: ubuntu-26.04
     permissions:
       contents: write
@@ -223,7 +177,7 @@ jobs:
       # One run at a time: both choose a free tag from the same package list.
       max-parallel: 1
       matrix:
-        nginx: ${{ fromJSON(needs.branches.outputs.list) }}
+        nginx: [mainline, stable]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -246,8 +200,9 @@ jobs:
         run: sha256sum -- *.so > SHA256SUMS
 
       # The image holds the same modules as the release, so equal checksums
-      # mean an equal image too. A change of the image layout alone needs
-      # workflow_dispatch with force.
+      # mean an equal image too. Only the checksums count, not the file names.
+      # A change of the image layout alone needs workflow_dispatch with force.
+      # The next tag is the last release number plus one.
       - name: Compare with the last release
         id: compare
         env:
@@ -256,20 +211,24 @@ jobs:
           FORCE: ${{ inputs.force }}
         run: |
           nginx=$(scripts/nginx-version.sh "$BRANCH")
-          last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
-            --json tagName --jq '.[].tagName' |
-            grep -E "^${nginx//./\\.}-[0-9]+$" | sort -t- -k2 -n | tail -1 || true)
+          last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 \
+            --json tagName --jq '.[].tagName' | sed -n "s/^${nginx}-//p" | sort -n | tail -1)
           changed=true
           if [[ $FORCE != true && -n $last ]] &&
-            gh release download "$last" --repo "$GITHUB_REPOSITORY" \
-              --pattern SHA256SUMS --output last.sums &&
-            cmp -s last.sums binaries/SHA256SUMS; then
+            gh release download "$nginx-$last" --repo "$GITHUB_REPOSITORY" \
+              --pattern SHA256SUMS --output last.sums --clobber &&
+            [[ $(cut -d' ' -f1 last.sums | sort) == $(cut -d' ' -f1 binaries/SHA256SUMS | sort) ]]; then
             changed=false
             echo "## ${BRANCH}: unchanged" >> "$GITHUB_STEP_SUMMARY"
-            echo "The modules equal the release ${last}. Nothing is published." >> "$GITHUB_STEP_SUMMARY"
+            echo "The modules equal the release $nginx-$last. Nothing is published." >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
-          echo "Last release ${last:-none}, changed: $changed"
+          tag="$nginx-$(( ${last:-0} + 1 ))"
+          {
+            echo "changed=$changed"
+            echo "nginx=$nginx"
+            echo "tag=$tag"
+          } >> "$GITHUB_OUTPUT"
+          echo "Last release $nginx-${last:-none}, changed: $changed, next: $tag"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         if: steps.compare.outputs.changed == 'true'
@@ -281,32 +240,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Choose the tag
-        id: tag
+      - name: Put the release tag in the file names
         if: steps.compare.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          BRANCH: ${{ matrix.nginx }}
+          TAG: ${{ steps.compare.outputs.tag }}
+        working-directory: binaries
         run: |
-          nginx=$(scripts/nginx-version.sh "$BRANCH")
-          # No package yet on the first run: the list stays empty.
-          existing=$(gh api "/orgs/${REPO%%/*}/packages/container/${REPO#*/}/versions" \
-            --paginate --jq '.[].metadata.container.tags[]' 2>/dev/null || true)
-          n=1
-          while grep -qx "${nginx}-${n}" <<<"$existing"; do
-            n=$((n + 1))
+          for f in *.so; do
+            mv "$f" "${f/_module-/_module-$TAG-}"
           done
-          echo "nginx=$nginx" >> "$GITHUB_OUTPUT"
-          echo "tag=${nginx}-${n}" >> "$GITHUB_OUTPUT"
-          echo "Publishing ${nginx}-${n}"
+          sha256sum -- *.so > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Create the multi-arch image
         id: index
         if: steps.compare.outputs.changed == 'true'
         env:
-          TAG: ${{ steps.tag.outputs.tag }}
-          NGINX: ${{ steps.tag.outputs.nginx }}
+          TAG: ${{ steps.compare.outputs.tag }}
+          NGINX: ${{ steps.compare.outputs.nginx }}
           BRANCH: ${{ matrix.nginx }}
         working-directory: digests
         run: |
@@ -339,8 +290,8 @@ jobs:
         if: steps.compare.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.tag.outputs.tag }}
-          NGINX: ${{ steps.tag.outputs.nginx }}
+          TAG: ${{ steps.compare.outputs.tag }}
+          NGINX: ${{ steps.compare.outputs.nginx }}
           BRANCH: ${{ matrix.nginx }}
         run: |
           cat > notes.md <<EOF
@@ -351,8 +302,8 @@ jobs:
 
           | Files | Built on | Loads into | Needs |
           |---|---|---|---|
-          | \`*-${NGINX}-<arch>.so\` | Debian trixie (glibc) | \`nginx:${NGINX}-trixie\`, nginx.org packages for trixie | \`libmaxminddb0\` |
-          | \`*-${NGINX}-alpine-<arch>.so\` | Alpine (musl) | \`nginx:${NGINX}-alpine\` | \`libmaxminddb-libs\` |
+          | \`*-${TAG}-debian-<arch>.so\` | Debian trixie (glibc) | \`nginx:${NGINX}-trixie\`, nginx.org packages for trixie | \`libmaxminddb0\` |
+          | \`*-${TAG}-alpine-<arch>.so\` | Alpine (musl) | \`nginx:${NGINX}-alpine\` | \`libmaxminddb-libs\` |
 
           The same Debian modules are in the image \`${IMAGE}:${TAG}\`.
 
@@ -360,7 +311,7 @@ jobs:
 
           \`\`\`sh
           sha256sum --check --ignore-missing SHA256SUMS
-          gh attestation verify ngx_http_geoip2_module-${NGINX}-amd64.so --owner intechcore
+          gh attestation verify ngx_http_geoip2_module-${TAG}-debian-amd64.so --owner intechcore
           \`\`\`
           EOF
           # The latest release is the mainline one. gh release download takes it

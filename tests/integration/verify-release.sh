@@ -29,8 +29,8 @@ case $(docker info --format '{{.Architecture}}') in
 esac
 
 case $OS in
-  debian) suffix="$VERSION-$arch"; base="nginx:$VERSION-trixie" ;;
-  alpine) suffix="$VERSION-alpine-$arch"; base="nginx:$VERSION-alpine" ;;
+  debian) base="nginx:$VERSION-trixie" ;;
+  alpine) base="nginx:$VERSION-alpine" ;;
   *) echo "usage: verify-release.sh <nginx version> <debian|alpine>" >&2; exit 2 ;;
 esac
 
@@ -43,7 +43,7 @@ sha256() {
 }
 
 work="$(mktemp -d)"
-tag_image="geoip2-release:$suffix"
+tag_image="geoip2-release:$VERSION-$OS-$arch"
 trap 'git -C "$ROOT" worktree remove --force "$work/src" >/dev/null 2>&1 || true
       rm -rf "$work"; docker rmi "$tag_image" >/dev/null 2>&1 || true' EXIT
 
@@ -54,6 +54,7 @@ if [[ -z $tag ]]; then
   exit 1
 fi
 echo "release $tag, $OS $arch"
+suffix="$tag-$OS-$arch"
 
 gh release download "$tag" --repo "$REPO" --dir "$work" \
   --pattern "ngx_http_geoip2_module-$suffix.so" \
