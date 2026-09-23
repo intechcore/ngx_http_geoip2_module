@@ -12,7 +12,10 @@ Upstream has had no commits since 2024-04. This fork adds:
     for the same client address ([#134](https://github.com/leev/ngx_http_geoip2_module/issues/134)).
   - A new database file with an older mtime than the nginx start was never loaded. The
     module now also checks the inode and the size.
-- Tests: lookups over IPv4 and IPv6, the default value, and both reload cases. See `tests/`.
+- A fix for the stream module: an invalid `auto_reload` interval crashed `nginx -t`. Upstream
+  fixed the same line in the http module only.
+- Tests: lookups over IPv4 and IPv6, the default value, both reload cases, and invalid
+  configuration. See `tests/`.
 - Prebuilt module images for the official nginx images (Debian trixie), amd64 and arm64.
 
 The module code otherwise stays as in upstream. Fixes go back upstream where possible.
@@ -38,7 +41,8 @@ gh attestation verify oci://ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6-1 \
   --owner intechcore
 ```
 
-Only the http module is built. The stream module is in the sources but not in the image.
+The image holds the http module only. The stream module is built and its configuration
+checks are tested, but it is not published.
 
 ## Build and test
 
