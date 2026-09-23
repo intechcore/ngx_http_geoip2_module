@@ -100,19 +100,11 @@ jobs:
 
       - name: Run the tests with coverage
         if: steps.token.outputs.present == 'true'
-        run: |
-          mkdir -p "$RUNNER_TEMP/gcov"
-          DOCKER_RUN_ARGS="-e GCOV_PREFIX=/cov -e GCOV_PREFIX_STRIP=0 -v $RUNNER_TEMP/gcov:/cov" \
-            tests/run.sh geoip2:coverage
+        run: tests/coverage.sh geoip2:coverage build
 
-      - name: Prepare the coverage report and the build tree
+      - name: Prepare the build tree
         if: steps.token.outputs.present == 'true'
         run: |
-          mkdir -p build
-          docker run --rm -v "$RUNNER_TEMP/gcov:/cov" -v "$PWD/build:/out" geoip2:coverage sh -c '
-            cp -a /cov/build/. /build/ &&
-            gcovr --root /build/module --sonarqube /out/coverage.xml --txt-summary /build/nginx-*/objs &&
-            cp /build/compile_commands.json /out/'
           sudo mkdir -p /build
           sudo chown "$(id -u):$(id -g)" /build
           id=$(docker create geoip2:coverage)

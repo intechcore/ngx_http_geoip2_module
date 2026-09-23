@@ -5,7 +5,9 @@
 #   tests/run.sh <test image>     build it with: docker build --target test -t <image> .
 #
 # DOCKER_RUN_ARGS adds arguments to every docker run, for example the gcov
-# settings of the coverage build in CI.
+# settings of the coverage build in CI. NGINX_GLOBALS adds global directives to
+# every nginx run, for example the env directives that keep the gcov settings
+# in the workers.
 #
 # fixtures/a.mmdb and fixtures/b.mmdb map the same addresses to different
 # countries: 203.0.113.0/24 is DE in a and FR in b, 2001:db8::/32 is CH in a
@@ -20,6 +22,7 @@ IPV6=2001:db8::1
 UNKNOWN=198.51.100.1
 
 read -r -a EXTRA_ARGS <<<"${DOCKER_RUN_ARGS:-}"
+GLOBALS="${NGINX_GLOBALS:-}"
 
 passed=0
 failed=0
@@ -60,7 +63,7 @@ start() {
   cleanup
   container=$(docker run -d -p 127.0.0.1::8080 -v "$FIXTURES:/fixtures:ro" \
     ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"} --entrypoint sh "$IMAGE" \
-    -c 'mkdir -p /data && cp /fixtures/a.mmdb /data/current.mmdb && exec nginx -g "daemon off;"')
+    -c 'mkdir -p /data && cp /fixtures/a.mmdb /data/current.mmdb && exec nginx -g "daemon off; $0"' "$GLOBALS")
   port=$(docker port "$container" 8080/tcp | head -1 | awk -F: '{print $NF}')
   local _
   for _ in $(seq 1 50); do
@@ -117,7 +120,7 @@ no_crash() {
 echo "module"
 if docker run --rm -v "$FIXTURES:/fixtures:ro" \
   ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"} --entrypoint sh "$IMAGE" \
-  -c 'mkdir -p /data && cp /fixtures/a.mmdb /data/current.mmdb && nginx -t' >/dev/null 2>&1; then
+  -c 'mkdir -p /data && cp /fixtures/a.mmdb /data/current.mmdb && nginx -t -g "$0"' "$GLOBALS" >/dev/null 2>&1; then
   ok "nginx -t accepts the module and the geoip2 block"
 else
   not_ok "nginx -t accepts the module and the geoip2 block"
@@ -129,7 +132,7 @@ rejected() {
   local out rc=0
   out=$(docker run --rm -v "$FIXTURES:/fixtures:ro" -v "$CONF:/conf:ro" \
     ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"} --entrypoint nginx "$IMAGE" \
-    -t -c "/conf/$2" 2>&1) || rc=$?
+    -t -c "/conf/$2" ${GLOBALS:+-g "$GLOBALS"} 2>&1) || rc=$?
   if [[ $rc -eq 0 ]]; then
     not_ok "$1: accepted"
   elif [[ $rc -eq 139 ]]; then

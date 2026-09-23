@@ -62,8 +62,9 @@ COPY tests/nginx.conf /etc/nginx/nginx.conf
 
 # Coverage build for SonarCloud, used by CI only. It rebuilds both modules
 # (http and stream) with gcov instrumentation and records the compile commands
-# with bear. The http module then replaces the test module. Workers run as root
-# here, so they can write the gcov counters to any mounted directory.
+# with bear. Both modules then replace the test modules. tests/coverage.sh runs
+# the workers as root, so they can write the gcov counters to a mounted
+# directory.
 FROM build AS coverage
 ARG NGINX_VERSION
 # hadolint ignore=DL3008
@@ -77,7 +78,6 @@ RUN make clean && \
     bear --output /build/compile_commands.json -- make modules && \
     cp objs/ngx_http_geoip2_module.so objs/ngx_stream_geoip2_module.so /usr/lib/nginx/modules/
 COPY tests/nginx.conf /etc/nginx/nginx.conf
-RUN sed -i '1i user root;' /etc/nginx/nginx.conf
 
 FROM scratch AS module
 ARG NGINX_VERSION
