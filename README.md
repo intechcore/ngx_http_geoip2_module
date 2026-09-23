@@ -287,19 +287,28 @@ coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocat
 
 ### CI and releases
 
-- CI builds and tests on native amd64 and arm64 runners, for Debian and Alpine, and runs
-  ShellCheck and Hadolint.
-- SonarCloud analyzes every pull request and `master` with the coverage of the tests.
-- Renovate bumps `NGINX_VERSION` when a new nginx image appears.
-- A merge to `master` that changes a build input publishes the image and the release for that
-  nginx version, with provenance attestations.
+| Event | What runs |
+|---|---|
+| A pull request | CI builds both modules and runs `tests/run.sh` on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the scripts in `tests/`, Hadolint checks the `Dockerfile`. SonarCloud and CodeQL analyze the code. |
+| A merge to `master` that changes `config`, `ngx_*.c`, `ngx_*.h`, `Dockerfile` or `keys/` | The publish workflow runs the tests again. It then pushes the image `<nginx>-<n>` and creates the GitHub release with the same tag. |
+| A new `nginx:<version>-trixie` image | Renovate opens a pull request that sets the new `NGINX_VERSION` in the `Dockerfile`. Its merge publishes the modules for that nginx version. |
 
-The build verifies the nginx source tarball against the release manager keys in `keys/`. A
-release signed by another key fails the build. Check the new key on
-<https://nginx.org/en/pgp_keys.html>, then add it.
+The image and the release files carry a build provenance attestation.
+
+### nginx source signature
+
+The build downloads the nginx source from nginx.org and checks its GPG signature. The public
+keys of the nginx release managers are in `keys/`. If a new nginx release is signed with a key
+that is not in `keys/`, the build fails on purpose. To fix it:
+
+1. Find the new key on <https://nginx.org/en/pgp_keys.html>.
+2. Add the key file to `keys/`.
+3. Open a pull request.
 
 ## License
 
-BSD-2-Clause, see [LICENSE](LICENSE). Copyright (C) Lee Valentine. The stream module and the
-shared code are also Copyright (C) Andrei Belov. The modules are based on the nginx geoip modules
-by Igor Sysoev.
+BSD-2-Clause, see [LICENSE](LICENSE).
+
+- Copyright (C) Lee Valentine.
+- The stream module and the shared code: also Copyright (C) Andrei Belov.
+- The modules are based on the nginx geoip modules by Igor Sysoev.
