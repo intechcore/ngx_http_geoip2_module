@@ -42,6 +42,8 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
   one branch publishes only that branch. The image tag `<nginx>` points to the latest build
   for that nginx version.
 - Renovate also updates the nginx versions in the README examples.
+- A CI job runs the tests on nginx and both modules built with AddressSanitizer and
+  UndefinedBehaviorSanitizer (`make asan`). It finds the heap overflow fixed above.
 - Builds and tests for the `nginx:<version>-alpine` image (musl). The releases hold these
   modules as `*-alpine-<arch>.so`.
 - Renovate for the nginx version and the GitHub Actions, pinned by SHA.

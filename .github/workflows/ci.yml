@@ -69,6 +69,30 @@ jobs:
       - name: Run the tests
         run: tests/run.sh geoip2:test
 
+  # The tests on nginx and both modules built with AddressSanitizer and
+  # UndefinedBehaviorSanitizer (Dockerfile stage asan), nginx mainline.
+  asan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build the sanitizer image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: asan
+          load: true
+          tags: geoip2:asan
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=asan
+
+      - name: Run the tests
+        run: tests/run.sh geoip2:asan
+
   # SonarCloud with coverage. The module is built with gcov inside the nginx
   # image (Dockerfile stage coverage) and runs the same tests. The analyzer then
   # needs the compile commands and the nginx build tree at the paths of that
