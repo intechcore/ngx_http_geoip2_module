@@ -44,7 +44,8 @@ RUN cat keys/*.key | gpg --dearmor > nginx-keyring.gpg && \
         "nginx-${NGINX_VERSION}.tar.gz.asc" "nginx-${NGINX_VERSION}.tar.gz" && \
     tar xzf "nginx-${NGINX_VERSION}.tar.gz"
 
-COPY config ngx_http_geoip2_module.c ngx_stream_geoip2_module.c module/
+COPY config ngx_geoip2_common.h ngx_http_geoip2_module.c ngx_stream_geoip2_module.c \
+     module/
 
 WORKDIR /build/nginx-${NGINX_VERSION}
 RUN ./configure --with-compat --with-stream --add-dynamic-module=../module && \

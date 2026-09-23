@@ -10,7 +10,7 @@ on:
     branches: [master]
     paths:
       - config
-      - 'ngx_*.c'
+      - 'ngx_*.[ch]'
       - Dockerfile
       - 'keys/**'
   workflow_dispatch:

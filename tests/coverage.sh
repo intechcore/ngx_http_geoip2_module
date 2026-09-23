@@ -8,10 +8,10 @@
 #
 # The output directory gets coverage.xml (SonarQube format), coverage.txt (the
 # branches not covered) and compile_commands.json. The script fails below 100%
-# line or branch coverage. nginx clears the
-# environment of its workers, so the env directives pass the gcov settings on.
-# The branches inside the FORMAT and ngx_log_error macros are excluded: an
-# allocation failure and a disabled log level.
+# line or branch coverage. nginx clears the environment of its workers, so the
+# env directives pass the gcov settings on. The branches inside the
+# NGX_GEOIP2_FORMAT and ngx_log_error macros are excluded: an allocation
+# failure and a disabled log level.
 set -euo pipefail
 
 IMAGE=${1:?usage: tests/coverage.sh <coverage image> <output directory>}
