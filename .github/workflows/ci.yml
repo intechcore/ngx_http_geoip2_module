@@ -72,15 +72,25 @@ jobs:
       - name: Run the tests
         run: tests/run.sh geoip2:test
 
-  # Integration tests with the MaxMind test databases (tests/integration),
-  # nginx mainline on amd64, in the Debian and the Alpine image.
+  # Integration tests (tests/integration): the MaxMind test databases and a
+  # proxy topology, nginx mainline on amd64, in the Debian, the Alpine and the
+  # sanitizer image.
   integration:
     name: integration (${{ matrix.os }})
     runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
-        os: [debian, alpine]
+        include:
+          - os: debian
+            target: test
+            scope: amd64
+          - os: alpine
+            target: test-alpine
+            scope: alpine-amd64
+          - os: asan
+            target: asan
+            scope: asan
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -92,10 +102,10 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          target: ${{ matrix.os == 'alpine' && 'test-alpine' || 'test' }}
+          target: ${{ matrix.target }}
           load: true
           tags: geoip2:test
-          cache-from: type=gha,scope=${{ matrix.os == 'alpine' && 'alpine-' || '' }}amd64
+          cache-from: type=gha,scope=${{ matrix.scope }}
 
       - name: Run the integration tests
         run: tests/integration/run.sh geoip2:test

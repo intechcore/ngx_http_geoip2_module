@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Integration tests. tests/run.sh checks each code path on synthetic fixtures;
 # these tests run the modules the way users do: with the MaxMind test
-# databases, which have the real GeoLite2 schema. The expected values come
-# from mmdblookup on the same databases.
+# databases, which have the real GeoLite2 schema, and behind proxies (see
+# proxies/compose.yml). The expected values come from mmdblookup on the same
+# databases.
 #
 #   tests/integration/run.sh <test image>     build it with: docker build --target test -t <image> .
 set -euo pipefail
@@ -12,7 +13,13 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 # shellcheck source=tests/lib.sh
 . "$HERE/../lib.sh"
-trap cleanup EXIT
+# compose <argument>...: docker compose on the proxy topology.
+compose() {
+  IMAGE="$IMAGE" DATABASES="$HERE/databases" \
+    docker compose -f "$HERE/proxies/compose.yml" "$@"
+}
+
+trap 'cleanup; [[ -n ${KEEP:-} ]] || compose down --timeout 5 >/dev/null 2>&1 || true' EXIT
 
 "$HERE/databases.sh"
 
@@ -59,5 +66,62 @@ check "Linköping: non-ASCII name, ASN" "SE|Linköping|29518" "$(stream 9000 89.
 check "San Diego: IPv6" "US|San Diego|-" "$(stream 9000 2001:480::1)"
 check "AT&T: only in the ASN database" "-|-|7018" "$(stream 9000 12.81.92.1)"
 no_crash "MaxMind test databases"
+
+# client <shell command>: run it in the client container, the output without
+# the newline.
+client() {
+  compose exec -T client bash -c "$1" | tr -d '\n'
+}
+
+# via_front <X-Forwarded-For>: what the app gets for a request through front:
+# country|escaped city|X-Forwarded-For.
+via_front() {
+  client "curl -fsS -H 'X-Forwarded-For: $1' http://172.30.123.20:8080/"
+}
+
+# proxied <server> <address>: the stream reply of the server to a PROXY
+# protocol header with the client address.
+proxied() {
+  client "exec 3<>/dev/tcp/$1/9000 && printf 'PROXY TCP4 $2 172.30.123.20 1000 9000\r\n' >&3 && cat <&3"
+}
+
+cleanup
+if ! out=$(compose up -d --quiet-pull 2>&1); then
+  echo "$out" >&2
+  exit 1
+fi
+up=""
+for _ in $(seq 1 50); do
+  if client 'curl -fsS http://172.30.123.20:8080/' >/dev/null 2>&1; then
+    up=yes
+    break
+  fi
+  sleep 0.2
+done
+if [[ -z $up ]]; then
+  compose logs >&2
+  echo "the proxy topology did not start" >&2
+  exit 1
+fi
+
+echo "proxy topology: http"
+check "client behind a trusted CDN and load balancer" \
+  "SE|Link%C3%B6ping|89.160.20.112, 172.30.123.10" "$(via_front 89.160.20.112)"
+check "recursive: the last address that is not trusted" \
+  "-|-|81.2.69.142, 10.1.2.3, 172.30.123.10" "$(via_front '81.2.69.142, 10.1.2.3')"
+check "without X-Forwarded-For: the CDN address" \
+  "-|-|172.30.123.10" "$(client 'curl -fsS http://172.30.123.20:8080/')"
+check "X-Forwarded-For from an untrusted address is ignored" "-|-|81.2.69.142" \
+  "$(compose exec -T app curl -fsS -H 'X-Forwarded-For: 81.2.69.142' http://172.30.123.30:8080/ | tr -d '\n')"
+
+echo "proxy topology: stream"
+check "client address through the load balancer and realip" \
+  "GB|London|81.2.69.142" "$(proxied 172.30.123.20 81.2.69.142)"
+check "PROXY header from an untrusted address is ignored" \
+  "-|-|172.30.123.10" "$(proxied 172.30.123.30 81.2.69.142)"
+
+container=$(compose ps -a -q geoip)
+no_crash "proxy topology"
+container=""
 
 summary
