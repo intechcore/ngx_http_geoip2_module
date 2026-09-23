@@ -14,7 +14,10 @@ Upstream has had no commits since 2024-04. This fork adds:
     module now also checks the inode and the size.
 - A fix for the stream module: an invalid `auto_reload` interval crashed `nginx -t`. Upstream
   fixed the same line in the http module only.
-- Tests: lookups over IPv4 and IPv6, the default value, both reload cases, and invalid
+- Fixes found by the tests: a heap overflow for uint128 and large double values, and an
+  out of bounds read for `$var metadata` without a field.
+- Tests for the http and the stream module with 100% line and branch coverage: every data
+  type, lookups, `geoip2_proxy`, metadata, `auto_reload` and its errors, and invalid
   configuration. See `tests/`.
 - Prebuilt module images for the official nginx images (Debian trixie), amd64 and arm64.
 
@@ -41,19 +44,22 @@ gh attestation verify oci://ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6-1 \
   --owner intechcore
 ```
 
-The image holds the http module only. The stream module is built and its configuration
-checks are tested, but it is not published.
+The image holds the http module only. The stream module is built and tested, but it is not
+published.
 
 ## Build and test
 
 ```sh
 make test            # build the module for NGINX_VERSION in the Dockerfile, run tests/run.sh
+make coverage        # run the tests on a gcov build, fail below 100% coverage
 make module          # build the module image
 make fixtures        # regenerate tests/fixtures/*.mmdb
 ```
 
 SonarCloud analyzes every pull request and `master`, with the coverage of `tests/run.sh`:
-the `coverage` build stage compiles the module with gcov, and CI runs the same tests on it.
+the `coverage` build stage compiles both modules with gcov, and CI runs the same tests on it.
+CI fails below 100% line or branch coverage. `GCOVR_EXCL` comments in the sources mark the
+code no test can reach, such as allocation failures.
 
 Renovate bumps `NGINX_VERSION` when a new `nginx:<version>-trixie` image appears. CI builds
 and tests the module on native amd64 and arm64 runners. A merge to `master` publishes the
@@ -156,6 +162,8 @@ Available fields:
   - build_epoch: the build timestamp of the maxmind database.
   - last_check: the last time the database was checked for changes (when using auto_reload)
   - last_change: the last time the database was reloaded (when using auto_reload)
+
+An unknown field or a missing field is a configuration error.
 
 ##### Autoreload (default: disabled):
 Enabling auto reload will have nginx check the modification time of the database at the specified

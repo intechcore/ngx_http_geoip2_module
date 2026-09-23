@@ -13,6 +13,13 @@
 #include <maxminddb.h>
 
 
+/*
+ * GCOVR_EXCL marks code the tests cannot reach: allocation failures and
+ * errors that valid input never triggers. tests/coverage.sh also excludes
+ * the branches inside the FORMAT and ngx_log_error macros.
+ */
+
+
 typedef struct {
     MMDB_s                   mmdb;
     MMDB_lookup_result_s     result;
@@ -144,8 +151,8 @@ ngx_stream_geoip2_variable(ngx_stream_session_t *s, ngx_stream_variable_value_t 
 #endif
 
     if (geoip2->source.value.len > 0) {
-         if (ngx_stream_complex_value(s, &geoip2->source, &val) != NGX_OK) {
-             goto not_found;
+         if (ngx_stream_complex_value(s, &geoip2->source, &val) != NGX_OK) {  /* GCOVR_EXCL_BR_LINE */
+             goto not_found;  /* GCOVR_EXCL_LINE */
          }
 
         if (ngx_parse_addr(s->connection->pool, &addr, val.data, val.len) != NGX_OK) {
@@ -197,8 +204,9 @@ ngx_stream_geoip2_variable(ngx_stream_session_t *s, ngx_stream_variable_value_t 
         goto not_found;
     }
 
-    if (!entry_data.has_data) {
-        goto not_found;
+    /* older libmaxminddb versions report a missing key this way */
+    if (!entry_data.has_data) {  /* GCOVR_EXCL_BR_LINE */
+        goto not_found;  /* GCOVR_EXCL_LINE */
     }
 
     switch (entry_data.type) {
@@ -208,16 +216,16 @@ ngx_stream_geoip2_variable(ngx_stream_session_t *s, ngx_stream_variable_value_t 
         case MMDB_DATA_TYPE_UTF8_STRING:
             v->len = entry_data.data_size;
             v->data = ngx_pnalloc(s->connection->pool, v->len);
-            if (v->data == NULL) {
-                return NGX_ERROR;
+            if (v->data == NULL) {  /* GCOVR_EXCL_BR_LINE */
+                return NGX_ERROR;  /* GCOVR_EXCL_LINE */
             }
             ngx_memcpy(v->data, (u_char *) entry_data.utf8_string, v->len);
             break;
         case MMDB_DATA_TYPE_BYTES:
             v->len = entry_data.data_size;
             v->data = ngx_pnalloc(s->connection->pool, v->len);
-            if (v->data == NULL) {
-                return NGX_ERROR;
+            if (v->data == NULL) {  /* GCOVR_EXCL_BR_LINE */
+                return NGX_ERROR;  /* GCOVR_EXCL_LINE */
             }
             ngx_memcpy(v->data, (u_char *) entry_data.bytes, v->len);
             break;
@@ -317,13 +325,13 @@ ngx_stream_geoip2_create_conf(ngx_conf_t *cf)
     ngx_stream_geoip2_conf_t  *conf;
 
     conf = ngx_pcalloc(cf->pool, sizeof(ngx_stream_geoip2_conf_t));
-    if (conf == NULL) {
-        return NULL;
+    if (conf == NULL) {  /* GCOVR_EXCL_BR_LINE */
+        return NULL;  /* GCOVR_EXCL_LINE */
     }
 
     cln = ngx_pool_cleanup_add(cf->pool, 0);
-    if (cln == NULL) {
-        return NULL;
+    if (cln == NULL) {  /* GCOVR_EXCL_BR_LINE */
+        return NULL;  /* GCOVR_EXCL_LINE */
     }
 
     ngx_queue_init(&conf->databases);
@@ -349,8 +357,8 @@ ngx_stream_geoip2(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     value = cf->args->elts;
 
     if (value[1].data[0] != '/') {
-        if (ngx_conf_full_name(cf->cycle, &value[1], 0) != NGX_OK) {
-            return NGX_CONF_ERROR;
+        if (ngx_conf_full_name(cf->cycle, &value[1], 0) != NGX_OK) {  /* GCOVR_EXCL_BR_LINE */
+            return NGX_CONF_ERROR;  /* GCOVR_EXCL_LINE */
         }
     }
 
@@ -369,8 +377,8 @@ ngx_stream_geoip2(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     database = ngx_pcalloc(cf->pool, sizeof(ngx_stream_geoip2_db_t));
-    if (database == NULL) {
-        return NGX_CONF_ERROR;
+    if (database == NULL) {  /* GCOVR_EXCL_BR_LINE */
+        return NGX_CONF_ERROR;  /* GCOVR_EXCL_LINE */
     }
 
     ngx_queue_insert_tail(&gcf->databases, &database->queue);
@@ -388,7 +396,7 @@ ngx_stream_geoip2(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     {
         ngx_file_info_t  fi;
 
-        if (ngx_file_info(database->mmdb.filename, &fi) != NGX_FILE_ERROR) {
+        if (ngx_file_info(database->mmdb.filename, &fi) != NGX_FILE_ERROR) {  /* GCOVR_EXCL_BR_LINE */
             database->file_uniq = ngx_file_uniq(&fi);
             database->file_size = ngx_file_size(&fi);
         }
@@ -478,8 +486,8 @@ ngx_stream_geoip2_add_variable_metadata(ngx_conf_t *cf, ngx_stream_geoip2_db_t *
     ngx_stream_variable_t         *var;
 
     metadata = ngx_pcalloc(cf->pool, sizeof(ngx_stream_geoip2_metadata_t));
-    if (metadata == NULL) {
-        return NGX_CONF_ERROR;
+    if (metadata == NULL) {  /* GCOVR_EXCL_BR_LINE */
+        return NGX_CONF_ERROR;  /* GCOVR_EXCL_LINE */
     }
 
     value = cf->args->elts;
@@ -529,8 +537,8 @@ ngx_stream_geoip2_add_variable_geodata(ngx_conf_t *cf, ngx_stream_geoip2_db_t *d
     int                                 i, nelts, idx;
 
     geoip2 = ngx_pcalloc(cf->pool, sizeof(ngx_stream_geoip2_ctx_t));
-    if (geoip2 == NULL) {
-        return NGX_CONF_ERROR;
+    if (geoip2 == NULL) {  /* GCOVR_EXCL_BR_LINE */
+        return NGX_CONF_ERROR;  /* GCOVR_EXCL_LINE */
     }
 
     geoip2->database = database;
@@ -603,8 +611,8 @@ ngx_stream_geoip2_add_variable_geodata(ngx_conf_t *cf, ngx_stream_geoip2_db_t *d
     geoip2->lookup = ngx_pcalloc(cf->pool,
                          sizeof(const char *) * (cf->args->nelts - (idx - 1)));
 
-    if (geoip2->lookup == NULL) {
-        return NGX_CONF_ERROR;
+    if (geoip2->lookup == NULL) {  /* GCOVR_EXCL_BR_LINE */
+        return NGX_CONF_ERROR;  /* GCOVR_EXCL_LINE */
     }
 
     for (i = idx; i < nelts; i++) {
@@ -727,8 +735,8 @@ ngx_stream_geoip2_init(ngx_conf_t *cf)
     cmcf = ngx_stream_conf_get_module_main_conf(cf, ngx_stream_core_module);
 
     h = ngx_array_push(&cmcf->phases[NGX_STREAM_LOG_PHASE].handlers);
-    if (h == NULL) {
-        return NGX_ERROR;
+    if (h == NULL) {  /* GCOVR_EXCL_BR_LINE */
+        return NGX_ERROR;  /* GCOVR_EXCL_LINE */
     }
 
     *h = ngx_stream_geoip2_log_handler;

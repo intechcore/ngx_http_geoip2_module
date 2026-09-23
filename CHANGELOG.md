@@ -24,9 +24,11 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
   module now also compares the inode and the size. From upstream PR #138 by Felipe Travi.
 
 ### Added
-- Tests in `tests/`: lookups over IPv4 and IPv6, the default value, both reload cases, and
-  an invalid `auto_reload` interval in http and stream.
-  Test databases are generated with MaxMind `mmdbwriter` from `tests/fixtures/generate`.
+- Tests in `tests/` for the http and the stream module: every MMDB data type, lookups over
+  IPv4 and IPv6, the default value, `geoip2_proxy`, metadata, the reload cases and reload
+  errors, and invalid configuration. They cover 100% of the lines and branches, and CI
+  fails below that. Test databases are generated with MaxMind `mmdbwriter` from
+  `tests/fixtures/generate`.
 - Docker build of the module inside the official `nginx:<version>-trixie` image. The nginx
   source tarball is verified against the release manager keys in `keys/`.
 - CI on native amd64 and arm64 runners, and publishing of the module image
