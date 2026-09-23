@@ -1,6 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "semanticCommitScope": null,
+  "ignorePaths": ["**/node_modules/**", "**/bower_components/**", "**/vendor/**", "**/examples/**"],
   "automerge": true,
   "automergeType": "pr",
   "platformAutomerge": false,
@@ -52,6 +54,16 @@
       "packageNameTemplate": "nginx",
       "datasourceTemplate": "docker",
       "extractVersionTemplate": "^(?<version>[\\d.]+)-trixie$"
+    },
+    {
+      "customType": "regex",
+      "description": "The commit of github.com/maxmind/MaxMind-DB the integration tests take their databases from",
+      "managerFilePatterns": ["tests/integration/databases.sh"],
+      "matchStrings": ["# renovate: maxmind-db\\nCOMMIT=(?<currentDigest>[0-9a-f]{40})"],
+      "depNameTemplate": "MaxMind-DB test data",
+      "packageNameTemplate": "https://github.com/maxmind/MaxMind-DB",
+      "currentValueTemplate": "main",
+      "datasourceTemplate": "git-refs"
     }
   ],
   "packageRules": [
@@ -72,6 +84,11 @@
       "matchDepNames": ["nginx stable"],
       "allowedVersions": "/^\\d+\\.\\d*[02468]\\.\\d+$/",
       "groupName": "nginx stable"
+    },
+    {
+      "description": "The MaxMind test databases change rarely: check monthly. A changed database fails the checksums in databases.sh until someone checks the expected values in tests/integration/run.sh.",
+      "matchDepNames": ["MaxMind-DB test data"],
+      "schedule": ["* 0-6 1 * *"]
     },
     {
       "description": "The Go generator of the test databases is a dev tool. Update it by hand.",

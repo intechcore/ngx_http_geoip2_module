@@ -4,10 +4,12 @@
 #
 # 1. The files of the latest GitHub release: SHA256SUMS, LICENSE and the
 #    build provenance attestation of each module.
-# 2. Debian only: the attestation of the module image, and that its module
-#    equals the one in the release.
+# 2. Debian only: the attestation of the module image, and that its modules
+#    equal the ones in the release.
 # 3. A clean nginx:<version>-trixie or nginx:<version>-alpine image with the
-#    released modules passes tests/run.sh and tests/integration/run.sh.
+#    released modules passes tests/run.sh and tests/integration/run.sh of the
+#    commit the release was built from. Tests of a later commit may expect a
+#    later behavior.
 #
 #   tests/integration/verify-release.sh <nginx version> <debian|alpine>
 #
@@ -18,8 +20,7 @@ VERSION=${1:?usage: verify-release.sh <nginx version> <debian|alpine>}
 OS=${2:?usage: verify-release.sh <nginx version> <debian|alpine>}
 REPO=intechcore/ngx_http_geoip2_module
 IMAGE=ghcr.io/$REPO
-HERE="$(cd "$(dirname "$0")" && pwd)"
-TESTS="$(cd "$HERE/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 case $(docker info --format '{{.Architecture}}') in
   x86_64 | amd64) arch=amd64 ;;
@@ -43,7 +44,8 @@ sha256() {
 
 work="$(mktemp -d)"
 tag_image="geoip2-release:$suffix"
-trap 'rm -rf "$work"; docker rmi "$tag_image" >/dev/null 2>&1 || true' EXIT
+trap 'git -C "$ROOT" worktree remove --force "$work/src" >/dev/null 2>&1 || true
+      rm -rf "$work"; docker rmi "$tag_image" >/dev/null 2>&1 || true' EXIT
 
 tag=$(gh release list --repo "$REPO" --limit 100 --json tagName --jq '.[].tagName' |
   grep -E "^${VERSION//./\\.}-[0-9]+$" | sort -t- -k2 -n | tail -1 || true)
@@ -88,20 +90,29 @@ if [[ $OS == debian ]]; then
   docker pull -q "$IMAGE:$tag" >/dev/null
   # The image has no command. The container never runs, docker cp reads it.
   id=$(docker create "$IMAGE:$tag" none)
-  docker cp "$id:/ngx_http_geoip2_module.so" "$work/image.so" >/dev/null
+  for module in http stream; do
+    file="ngx_${module}_geoip2_module"
+    if ! docker cp "$id:/$file.so" "$work/image-$module.so" >/dev/null ||
+      [[ $(sha256 "$work/image-$module.so") != $(sha256 "$work/$file-$suffix.so") ]]; then
+      docker rm "$id" >/dev/null
+      echo "the image has no $file.so, or it differs from the release" >&2
+      exit 1
+    fi
+    echo "  ok   the image $module module equals the release module"
+  done
   docker rm "$id" >/dev/null
-  if [[ $(sha256 "$work/image.so") != $(sha256 "$work/ngx_http_geoip2_module-$suffix.so") ]]; then
-    echo "the image module differs from the release module" >&2
-    exit 1
-  fi
-  echo "  ok   the image module equals the release module"
 fi
 
-echo "clean $base with the released modules"
+# The tests of the release commit: the tag points to it.
+git -C "$ROOT" fetch -q origin "refs/tags/$tag:refs/tags/$tag" 2>/dev/null || true
+git -C "$ROOT" worktree add -q --detach "$work/src" "$tag"
+tests="$work/src/tests"
+
+echo "clean $base with the released modules, tests of $tag"
 mkdir "$work/context"
 cp "$work/ngx_http_geoip2_module-$suffix.so" "$work/context/ngx_http_geoip2_module.so"
 cp "$work/ngx_stream_geoip2_module-$suffix.so" "$work/context/ngx_stream_geoip2_module.so"
-cp "$TESTS/nginx.conf" "$work/context/nginx.conf"
+cp "$tests/nginx.conf" "$work/context/nginx.conf"
 # The libraries the release notes name. bash runs the stream checks.
 if [[ $OS == alpine ]]; then
   install='apk add --no-cache bash libmaxminddb-libs'
@@ -115,5 +126,8 @@ COPY ngx_http_geoip2_module.so ngx_stream_geoip2_module.so /usr/lib/nginx/module
 COPY nginx.conf /etc/nginx/nginx.conf
 DOCKERFILE
 
-"$TESTS/run.sh" "$tag_image" | tail -1
-"$HERE/run.sh" "$tag_image" | tail -1
+"$tests/run.sh" "$tag_image" | tail -1
+# Releases before the integration tests have no tests/integration/run.sh.
+if [[ -x $tests/integration/run.sh ]]; then
+  "$tests/integration/run.sh" "$tag_image" | tail -1
+fi

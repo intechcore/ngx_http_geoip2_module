@@ -313,6 +313,20 @@ ngx_geoip2_variable(ngx_conf_t *cf, ngx_str_t *default_value,
 
 
 /*
+ * ngx_sprintf prints the integer part of a float or double as an int64. A
+ * value outside that range, NaN or an infinity has no such integer part: the
+ * lookup treats it as not found. NaN fails both comparisons.
+ */
+#define NGX_GEOIP2_FLOAT_LIMIT  9.2e18
+
+static ngx_uint_t
+ngx_geoip2_printable(double value)
+{
+    return value > -NGX_GEOIP2_FLOAT_LIMIT && value < NGX_GEOIP2_FLOAT_LIMIT;
+}
+
+
+/*
  * Percent-encodes each byte of value except letters, digits and "-._~", the
  * unreserved characters of RFC 3986.
  */
@@ -430,9 +444,15 @@ ngx_geoip2_lookup(ngx_pool_t *pool, ngx_geoip2_db_t *database,
             ngx_memcpy(value->data, entry_data.bytes, value->len);
             break;
         case MMDB_DATA_TYPE_FLOAT:
+            if (!ngx_geoip2_printable(entry_data.float_value)) {
+                return NGX_DECLINED;
+            }
             NGX_GEOIP2_FORMAT("%.5f", entry_data.float_value);
             break;
         case MMDB_DATA_TYPE_DOUBLE:
+            if (!ngx_geoip2_printable(entry_data.double_value)) {
+                return NGX_DECLINED;
+            }
             NGX_GEOIP2_FORMAT("%.5f", entry_data.double_value);
             break;
         case MMDB_DATA_TYPE_UINT16:

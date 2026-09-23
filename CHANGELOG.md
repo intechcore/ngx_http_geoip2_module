@@ -5,6 +5,8 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
 ## [Unreleased]
 
 ### Fixed
+- A float or double beyond the int64 range, NaN or infinity made nginx print undefined digits.
+  The lookup now treats such a value as not found.
 - A heap overflow in both modules: a uint128 value (34 characters) or a double with 14 or
   more integer digits went into a buffer of 20 bytes. The buffer now holds 64 bytes, and
   the write is bounded.
@@ -31,6 +33,7 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
   module now also compares the inode and the size. From upstream PR #138 by Felipe Travi.
 
 ### Added
+- The module image holds the stream module as well, `/ngx_stream_geoip2_module.so`.
 - A workflow verifies the published artifacts after each publish and once a week: checksums,
   license, attestations, and all tests on clean nginx images with the released modules.
 - Integration tests with the MaxMind test databases (real GeoLite2 City, Country and ASN

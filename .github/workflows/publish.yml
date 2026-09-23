@@ -245,8 +245,9 @@ jobs:
         working-directory: binaries
         run: sha256sum -- *.so > SHA256SUMS
 
-      # The image holds the same http module as the release, so equal checksums
-      # mean an equal image too.
+      # The image holds the same modules as the release, so equal checksums
+      # mean an equal image too. A change of the image layout alone needs
+      # workflow_dispatch with force.
       - name: Compare with the last release
         id: compare
         env:
@@ -353,7 +354,7 @@ jobs:
           | \`*-${NGINX}-<arch>.so\` | Debian trixie (glibc) | \`nginx:${NGINX}-trixie\`, nginx.org packages for trixie | \`libmaxminddb0\` |
           | \`*-${NGINX}-alpine-<arch>.so\` | Alpine (musl) | \`nginx:${NGINX}-alpine\` | \`libmaxminddb-libs\` |
 
-          The same http module is in the image \`${IMAGE}:${TAG}\`.
+          The same Debian modules are in the image \`${IMAGE}:${TAG}\`.
 
           Verify a download:
 
