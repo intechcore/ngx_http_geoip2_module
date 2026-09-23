@@ -31,6 +31,8 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
   module now also compares the inode and the size. From upstream PR #138 by Felipe Travi.
 
 ### Added
+- Integration tests with the MaxMind test databases (real GeoLite2 City, Country and ASN
+  schema), for both modules, in CI on Debian and Alpine (`make integration`).
 - The variable option `escape=uri` percent-encodes the value, for example for a request
   header to an upstream server that rejects non-ASCII bytes. Both modules. Upstream #125.
 - Tests in `tests/` for the http and the stream module: every MMDB data type, lookups over

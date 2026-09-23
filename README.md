@@ -302,7 +302,8 @@ header that is not trusted. A variable with `source=` ignores both directives.
 | `ngx_stream_geoip2_module.c` | the stream module: directives, client address, variables |
 | `config` | the nginx build configuration of both modules |
 | `Dockerfile` | the builds, the test images and the published artifacts |
-| `tests/` | `run.sh`, `coverage.sh`, the nginx configurations and the fixture databases |
+| `tests/` | `run.sh`, `coverage.sh`, `lib.sh`, the nginx configurations and the fixture databases |
+| `tests/integration/` | the integration tests with the MaxMind test databases |
 
 The Dockerfile stages:
 
@@ -321,6 +322,7 @@ The Dockerfile stages:
 ```sh
 make test          # build for nginx mainline and run tests/run.sh
 make test-alpine   # the same for nginx:<nginx>-alpine
+make integration   # run the integration tests
 make asan          # run the tests with AddressSanitizer and UndefinedBehaviorSanitizer
 make coverage      # run the tests on the gcov build, fail below 100% coverage
 make module        # build the module image
@@ -335,6 +337,11 @@ It checks lookups, every data type, metadata, `geoip2_proxy`, `auto_reload` and 
 every configuration error. The stream checks send the client address in a PROXY protocol header.
 The fixture databases come from `tests/fixtures/generate`.
 
+`tests/integration/run.sh` runs the modules the way users do. It downloads the MaxMind test
+databases of a fixed commit of [MaxMind-DB](https://github.com/maxmind/MaxMind-DB) and checks
+their checksums. They have the real GeoLite2 City, Country and ASN schema. The expected values
+come from `mmdblookup` on the same databases.
+
 `make asan` runs the same tests on nginx and both modules built with sanitizers. Each pool
 allocation of nginx is its own `malloc` there, so AddressSanitizer also finds an overflow inside
 a pool block. A sanitizer report fails the tests.
@@ -346,7 +353,7 @@ coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocat
 
 | Event | What runs |
 |---|---|
-| A pull request | CI builds both modules and runs `tests/run.sh` for nginx mainline and stable, on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the shell scripts, Hadolint checks the `Dockerfile`. A sanitizer build runs the tests too. SonarCloud and CodeQL analyze the code. |
+| A pull request | CI builds both modules and runs `tests/run.sh` for nginx mainline and stable, on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the shell scripts, Hadolint checks the `Dockerfile`. A sanitizer build runs the tests too, and the integration tests run on Debian and Alpine. SonarCloud and CodeQL analyze the code. |
 | A merge to `master` that changes `config`, `ngx_*.c`, `ngx_*.h`, `Dockerfile` or `keys/` | The publish workflow runs the tests again. It then pushes the image `<nginx>-<n>` and creates the GitHub release with the same tag, for mainline and stable. A merge that only bumps the version of one branch publishes only that branch. The build is reproducible: if the modules equal the last release of that nginx version, nothing is published. |
 | A new `nginx:<version>-trixie` image | Renovate opens a pull request that sets the new version in the `Dockerfile` (`NGINX_MAINLINE` or `NGINX_STABLE`) and in the README examples. Its merge publishes the modules for that nginx version. |
 
