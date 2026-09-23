@@ -37,6 +37,8 @@ static char *ngx_stream_geoip2_parse_config(ngx_conf_t *cf, ngx_command_t *dummy
     void *conf);
 static char *ngx_stream_geoip2_add_variable(ngx_conf_t *cf,
     ngx_geoip2_db_t *database);
+static ngx_stream_variable_t *ngx_stream_geoip2_new_variable(ngx_conf_t *cf,
+    ngx_str_t *name);
 static ngx_int_t ngx_stream_geoip2_init(ngx_conf_t *cf);
 
 
@@ -251,7 +253,7 @@ ngx_stream_geoip2_add_variable(ngx_conf_t *cf, ngx_geoip2_db_t *database)
             return rv;
         }
 
-        var = ngx_stream_add_variable(cf, &value[0], NGX_STREAM_VAR_CHANGEABLE);
+        var = ngx_stream_geoip2_new_variable(cf, &value[0]);
         if (var == NULL) {
             return NGX_CONF_ERROR;
         }
@@ -289,7 +291,7 @@ ngx_stream_geoip2_add_variable(ngx_conf_t *cf, ngx_geoip2_db_t *database)
         }
     }
 
-    var = ngx_stream_add_variable(cf, &value[0], NGX_STREAM_VAR_CHANGEABLE);
+    var = ngx_stream_geoip2_new_variable(cf, &value[0]);
     if (var == NULL) {
         return NGX_CONF_ERROR;
     }
@@ -298,6 +300,33 @@ ngx_stream_geoip2_add_variable(ngx_conf_t *cf, ngx_geoip2_db_t *database)
     var->data = (uintptr_t) geoip2;
 
     return NGX_CONF_OK;
+}
+
+
+/*
+ * Adds the variable of a geoip2 block. Rejects a name that a geoip2 block
+ * already defines: nginx would return that variable, and the new handler
+ * would replace the old one without a word.
+ */
+static ngx_stream_variable_t *
+ngx_stream_geoip2_new_variable(ngx_conf_t *cf, ngx_str_t *name)
+{
+    ngx_stream_variable_t  *var;
+
+    var = ngx_stream_add_variable(cf, name, NGX_STREAM_VAR_CHANGEABLE);
+    if (var == NULL) {
+        return NULL;
+    }
+
+    if (var->get_handler == ngx_stream_geoip2_variable
+        || var->get_handler == ngx_stream_geoip2_metadata)
+    {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "the duplicate geoip2 variable \"$%V\"", name);
+        return NULL;
+    }
+
+    return var;
 }
 
 

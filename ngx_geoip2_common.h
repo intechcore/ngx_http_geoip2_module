@@ -529,7 +529,7 @@ ngx_geoip2_reload(ngx_queue_t *databases, ngx_log_t *log)
         database->last_check = ngx_time();
 
         if (ngx_file_info(database->mmdb.filename, &fi) == NGX_FILE_ERROR) {
-            ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+            ngx_log_error(NGX_LOG_ERR, log, ngx_errno,
                           ngx_file_info_n " \"%s\" failed",
                           database->mmdb.filename);
 

@@ -12,6 +12,10 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
   without arguments read past them as well. Both modules.
 
 ### Changed
+- A variable name that a geoip2 block already defines is a configuration error. Before, the
+  last definition replaced the first one without a message.
+- A missing database file at an `auto_reload` check is logged as `error`, not `emerg`. The
+  module keeps the loaded database, so nginx is not in danger.
 - The http and the stream module share their database code in `ngx_geoip2_common.h`:
   opening, lookups with the cache, value formatting, variable arguments, metadata and
   `auto_reload`. A fix there applies to both modules.

@@ -268,6 +268,15 @@ for module in http stream; do
   rejected "unknown escape" "$module" \
     'geoip2 /fixtures/a.mmdb { $v escape=url country iso_code; }' \
     'invalid setting "escape=url" for "$v"'
+  rejected "variable in two geoip2 blocks" "$module" \
+    'geoip2 /fixtures/a.mmdb { $v country iso_code; } geoip2 /fixtures/v4.mmdb { $v country iso_code; }' \
+    'the duplicate geoip2 variable "$v"'
+  rejected "variable twice in one block, other case" "$module" \
+    'geoip2 /fixtures/a.mmdb { $v country iso_code; $V country names en; }' \
+    'the duplicate geoip2 variable "$V"'
+  rejected "metadata variable, then a lookup variable" "$module" \
+    'geoip2 /fixtures/a.mmdb { $v metadata build_epoch; $v country iso_code; }' \
+    'the duplicate geoip2 variable "$v"'
   rejected "metadata without a field" "$module" \
     'geoip2 /fixtures/a.mmdb { $v metadata; }' \
     'invalid number of arguments for metadata "$v"'
