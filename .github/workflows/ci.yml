@@ -28,18 +28,32 @@ jobs:
           dockerfile: Dockerfile
 
   # Native runners per architecture: the module is compiled and tested without
-  # QEMU emulation.
+  # QEMU emulation, for the Debian and the Alpine nginx image. The Debian jobs
+  # keep the names test (amd64) and test (arm64), which the branch ruleset
+  # requires.
   test:
-    name: test (${{ matrix.arch }})
+    name: test (${{ matrix.label }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - arch: amd64
+          - label: amd64
             runner: ubuntu-24.04
-          - arch: arm64
+            target: test
+            scope: amd64
+          - label: arm64
             runner: ubuntu-24.04-arm
+            target: test
+            scope: arm64
+          - label: alpine amd64
+            runner: ubuntu-24.04
+            target: test-alpine
+            scope: alpine-amd64
+          - label: alpine arm64
+            runner: ubuntu-24.04-arm
+            target: test-alpine
+            scope: alpine-arm64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,11 +65,11 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          target: test
+          target: ${{ matrix.target }}
           load: true
           tags: geoip2:test
-          cache-from: type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.scope }}
 
       - name: Run the tests
         run: tests/run.sh geoip2:test

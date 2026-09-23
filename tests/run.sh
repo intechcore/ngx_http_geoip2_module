@@ -325,7 +325,7 @@ echo "auto_reload, new database with an old mtime"
 start
 check "http: before the swap" DE "$(lookup "$IPV4")"
 check "stream: before the swap" DE "$(stream_lookup "$IPV4")"
-replace_db "touch -d 2020-01-01 /data/new.mmdb"
+replace_db "touch -d \"2020-01-01 00:00:00\" /data/new.mmdb"
 trigger_reload
 check "http: database is reloaded although its mtime is older" FR "$(lookup "$IPV4")"
 check "stream: database is reloaded although its mtime is older" FR "$(stream_lookup "$IPV4")"
@@ -338,7 +338,7 @@ no_crash "reload with an old mtime"
 echo "auto_reload, database changed in place with an old mtime"
 start
 docker exec "$container" sh -c \
-  'cp /fixtures/b.mmdb /data/current.mmdb && touch -d 2020-01-01 /data/current.mmdb'
+  'cp /fixtures/b.mmdb /data/current.mmdb && touch -d "2020-01-01 00:00:00" /data/current.mmdb'
 trigger_reload
 check "http: the new size triggers the reload" FR "$(lookup "$IPV4")"
 check "stream: the new size triggers the reload" FR "$(stream_lookup "$IPV4")"

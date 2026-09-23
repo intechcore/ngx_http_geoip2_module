@@ -4,7 +4,8 @@ name: Publish
 # when a build input changes on master: the module sources, the Dockerfile
 # (for example a Renovate bump of NGINX_VERSION) or the nginx signing keys.
 # <n> counts the builds for one nginx version and starts at 1. A GitHub release
-# with the same tag holds the http and the stream module for amd64 and arm64.
+# with the same tag holds the http and the stream module for amd64 and arm64,
+# built for the Debian and the Alpine nginx image.
 
 on:
   push:
@@ -69,6 +70,19 @@ jobs:
       - name: Run the tests
         run: tests/run.sh geoip2:test
 
+      - name: Build the Alpine test image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: test-alpine
+          load: true
+          tags: geoip2:test-alpine
+          cache-from: type=gha,scope=alpine-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=alpine-${{ matrix.arch }}
+
+      - name: Run the tests on Alpine
+        run: tests/run.sh geoip2:test-alpine
+
       - name: Push the module image by digest
         id: push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -102,6 +116,15 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.arch }}
           outputs: type=local,dest=binaries
 
+      - name: Extract the Alpine module binaries
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: binaries-alpine
+          platforms: linux/${{ matrix.arch }}
+          cache-from: type=gha,scope=alpine-${{ matrix.arch }}
+          outputs: type=local,dest=binaries-alpine
+
       - name: Name the binaries by nginx version and architecture
         env:
           ARCH: ${{ matrix.arch }}
@@ -109,6 +132,10 @@ jobs:
           nginx=$(awk -F= '/^ARG NGINX_VERSION=/ { print $2; exit }' Dockerfile)
           for f in binaries/*.so; do
             mv "$f" "${f%.so}-${nginx}-${ARCH}.so"
+          done
+          for f in binaries-alpine/*.so; do
+            base=${f#binaries-alpine/}
+            mv "$f" "binaries/${base%.so}-${nginx}-alpine-${ARCH}.so"
           done
           ls -l binaries
 
@@ -212,10 +239,13 @@ jobs:
           cat > notes.md <<EOF
           ngx_http_geoip2_module and ngx_stream_geoip2_module for nginx ${NGINX}, amd64 and arm64.
 
-          The modules are built on Debian trixie with \`--with-compat\`. They load into
-          nginx ${NGINX} from the official \`nginx:${NGINX}-trixie\` image or the nginx.org
-          packages for trixie, and need \`libmaxminddb0\`. A dynamic module loads only into
-          the nginx version it was built for.
+          All modules are built with \`--with-compat\`. A dynamic module loads only into the
+          nginx version it was built for.
+
+          | Files | Built on | Loads into | Needs |
+          |---|---|---|---|
+          | \`*-${NGINX}-<arch>.so\` | Debian trixie (glibc) | \`nginx:${NGINX}-trixie\`, nginx.org packages for trixie | \`libmaxminddb0\` |
+          | \`*-${NGINX}-alpine-<arch>.so\` | Alpine (musl) | \`nginx:${NGINX}-alpine\` | \`libmaxminddb-libs\` |
 
           The same http module is in the image \`${IMAGE}:${TAG}\`.
 

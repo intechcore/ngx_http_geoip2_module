@@ -9,7 +9,8 @@
 #
 # Stages: build compiles, test adds the module to nginx for tests/run.sh,
 # binaries holds both modules for the GitHub release, module (the default) is
-# the published image.
+# the published image. build-alpine, test-alpine and binaries-alpine do the
+# same for the nginx:<version>-alpine image (musl).
 
 # renovate: nginx
 ARG NGINX_VERSION=1.31.6
@@ -85,6 +86,40 @@ COPY tests/nginx.conf /etc/nginx/nginx.conf
 # publish workflow attaches them to the GitHub release.
 FROM scratch AS binaries
 COPY --from=build /build/ngx_http_geoip2_module.so /build/ngx_stream_geoip2_module.so /
+
+# The same modules for the official nginx:<version>-alpine image, built against
+# musl. The nginx source is the tarball the build stage verified.
+FROM nginx:${NGINX_VERSION}-alpine AS build-alpine
+ARG NGINX_VERSION
+# hadolint ignore=DL3018
+RUN apk add --no-cache \
+        build-base \
+        libmaxminddb-dev \
+        linux-headers \
+        openssl-dev \
+        pcre2-dev \
+        zlib-dev
+WORKDIR /build
+COPY --from=build /build/nginx-${NGINX_VERSION}.tar.gz ./
+RUN tar xzf "nginx-${NGINX_VERSION}.tar.gz"
+COPY config ngx_geoip2_common.h ngx_http_geoip2_module.c ngx_stream_geoip2_module.c \
+     module/
+WORKDIR /build/nginx-${NGINX_VERSION}
+RUN ./configure --with-compat --with-stream --add-dynamic-module=../module && \
+    make modules && \
+    cp objs/ngx_http_geoip2_module.so objs/ngx_stream_geoip2_module.so /build/
+
+# bash runs the stream checks of tests/run.sh inside the container.
+FROM nginx:${NGINX_VERSION}-alpine AS test-alpine
+# hadolint ignore=DL3018
+RUN apk add --no-cache bash libmaxminddb-libs
+COPY --from=build-alpine /build/ngx_http_geoip2_module.so \
+     /build/ngx_stream_geoip2_module.so /usr/lib/nginx/modules/
+COPY tests/nginx.conf /etc/nginx/nginx.conf
+
+FROM scratch AS binaries-alpine
+COPY --from=build-alpine /build/ngx_http_geoip2_module.so \
+     /build/ngx_stream_geoip2_module.so /
 
 FROM scratch AS module
 ARG NGINX_VERSION

@@ -58,10 +58,14 @@ The image holds the http module only. The releases hold both modules.
 Each image tag has a [GitHub release](https://github.com/intechcore/ngx_http_geoip2_module/releases)
 with the same name. It holds `ngx_http_geoip2_module-<nginx>-<arch>.so` and
 `ngx_stream_geoip2_module-<nginx>-<arch>.so` for amd64 and arm64, `SHA256SUMS` and `LICENSE`.
+The `-alpine-` files are the same modules built for Alpine (musl).
 
-The modules are built on Debian trixie with `--with-compat`. They load into the same nginx version
-from the official `nginx:<version>-trixie` image or the nginx.org packages for trixie. They need
-`libmaxminddb0`.
+| Files | Built on | Loads into | Needs |
+|---|---|---|---|
+| `*-<nginx>-<arch>.so` | Debian trixie (glibc) | `nginx:<version>-trixie`, nginx.org packages for trixie | `libmaxminddb0` |
+| `*-<nginx>-alpine-<arch>.so` | Alpine (musl) | `nginx:<version>-alpine` | `libmaxminddb-libs` |
+
+All modules are built with `--with-compat` and load only into the same nginx version.
 
 The commands below take the http module from the latest release. For another nginx version,
 pass its tag to `gh release download`.
@@ -79,6 +83,7 @@ sudo install -m 644 ngx_http_geoip2_module-*-amd64.so \
 
 ```sh
 make test            # build the module for NGINX_VERSION in the Dockerfile, run tests/run.sh
+make test-alpine     # the same for nginx:<version>-alpine
 make coverage        # run the tests on a gcov build, fail below 100% coverage
 make module          # build the module image
 make fixtures        # regenerate tests/fixtures/*.mmdb

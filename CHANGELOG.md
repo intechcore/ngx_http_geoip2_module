@@ -37,7 +37,9 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
 - CI on native amd64 and arm64 runners, and publishing of the module image
   `ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n>` with a provenance attestation.
 - GitHub releases with the http and the stream module for amd64 and arm64, with the same tag
-  as the module image, `SHA256SUMS` and a provenance attestation.
+  as the module image, `SHA256SUMS`, `LICENSE` and a provenance attestation.
+- Builds and tests for the `nginx:<version>-alpine` image (musl). The releases hold these
+  modules as `*-alpine-<arch>.so`.
 - Renovate for the nginx version and the GitHub Actions, pinned by SHA.
 - SonarCloud analysis in CI with test coverage. A `coverage` build stage compiles both modules
   with gcov and records the compile commands.
