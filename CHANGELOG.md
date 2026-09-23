@@ -33,6 +33,8 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
   module now also compares the inode and the size. From upstream PR #138 by Felipe Travi.
 
 ### Added
+- Static analysis in CI with gcc -fanalyzer, clang-tidy and cppcheck (`make analyze`). A finding
+  fails the build.
 - The module image holds the stream module as well, `/ngx_stream_geoip2_module.so`.
 - A workflow verifies the published artifacts after each publish and once a week: checksums,
   license, attestations, and all tests on clean nginx images with the released modules.
