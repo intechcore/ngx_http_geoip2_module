@@ -59,3 +59,75 @@ jobs:
 
       - name: Run the tests
         run: tests/run.sh geoip2:test
+
+  # SonarCloud with coverage. The module is built with gcov inside the nginx
+  # image (Dockerfile stage coverage) and runs the same tests. The analyzer then
+  # needs the compile commands and the nginx build tree at the paths of that
+  # build, so the tree is copied to /build on the runner.
+  sonar:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check for the token
+        id: token
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          # Pull requests from forks get no secrets. Skip the analysis there.
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No SONAR_TOKEN, SonarCloud analysis skipped"
+          fi
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: steps.token.outputs.present == 'true'
+
+      - name: Build the coverage image
+        if: steps.token.outputs.present == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: coverage
+          load: true
+          tags: geoip2:coverage
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=coverage
+
+      - name: Run the tests with coverage
+        if: steps.token.outputs.present == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/gcov"
+          DOCKER_RUN_ARGS="-e GCOV_PREFIX=/cov -e GCOV_PREFIX_STRIP=0 -v $RUNNER_TEMP/gcov:/cov" \
+            tests/run.sh geoip2:coverage
+
+      - name: Prepare the coverage report and the build tree
+        if: steps.token.outputs.present == 'true'
+        run: |
+          mkdir -p build
+          docker run --rm -v "$RUNNER_TEMP/gcov:/cov" -v "$PWD/build:/out" geoip2:coverage sh -c '
+            cp -a /cov/build/. /build/ &&
+            gcovr --root /build/module --sonarqube /out/coverage.xml --txt-summary /build/nginx-*/objs &&
+            cp /build/compile_commands.json /out/'
+          sudo mkdir -p /build
+          sudo chown "$(id -u):$(id -g)" /build
+          id=$(docker create geoip2:coverage)
+          docker cp "$id:/build/." /build/
+          docker rm "$id" >/dev/null
+          # The analyzer reads the sources from the checkout, not from the image.
+          # Both the file field and the relative path in the arguments point there.
+          sed -i -e "s|/build/module/|$GITHUB_WORKSPACE/|g" \
+                 -e "s|\"\\.\\./module/|\"$GITHUB_WORKSPACE/|g" build/compile_commands.json
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libmaxminddb-dev libpcre2-dev libssl-dev zlib1g-dev >/dev/null
+
+      - name: SonarCloud scan
+        if: steps.token.outputs.present == 'true'
+        uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

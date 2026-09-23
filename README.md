@@ -48,6 +48,9 @@ make module          # build the module image
 make fixtures        # regenerate tests/fixtures/*.mmdb
 ```
 
+SonarCloud analyzes every pull request and `master`, with the coverage of `tests/run.sh`:
+the `coverage` build stage compiles the module with gcov, and CI runs the same tests on it.
+
 Renovate bumps `NGINX_VERSION` when a new `nginx:<version>-trixie` image appears. CI builds
 and tests the module on native amd64 and arm64 runners. A merge to `master` publishes the
 module image for that nginx version.
