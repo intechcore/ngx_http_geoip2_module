@@ -64,6 +64,7 @@ COPY tests/nginx.conf /etc/nginx/nginx.conf
 # with bear. The http module then replaces the test module. Workers run as root
 # here, so they can write the gcov counters to any mounted directory.
 FROM build AS coverage
+ARG NGINX_VERSION
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends bear gcovr libmaxminddb0 && \
