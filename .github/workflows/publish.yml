@@ -4,10 +4,10 @@ name: Publish
 # and a GitHub release with the same tag, for the mainline and the stable nginx
 # branch. It runs when a build input changes on master: the module sources, the
 # Dockerfile (for example a Renovate bump of an nginx version) or the nginx
-# signing keys. <n> counts the builds for one nginx version and starts at 1.
-# The release holds the http and the stream module for amd64 and arm64, built
-# for the Debian and the Alpine nginx image. The build is reproducible: if the
-# modules equal the last release of that nginx version, nothing is published.
+# signing keys. <n> counts the builds for one nginx version. The release holds
+# the http and the stream module for amd64 and arm64, built for the Debian and
+# the Alpine nginx image. The build is reproducible: a branch whose modules
+# equal its last release is not published again.
 
 on:
   push:
@@ -19,11 +19,6 @@ on:
       - 'keys/**'
   workflow_dispatch:
     inputs:
-      nginx:
-        description: nginx branch to publish
-        type: choice
-        options: [both, mainline, stable]
-        default: both
       force:
         description: publish even if the modules equal the last release
         type: boolean
@@ -39,52 +34,11 @@ env:
   IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  # A push that only bumps the version of one nginx branch publishes only that
-  # branch. Any other change of a build input publishes both.
-  branches:
-    runs-on: ubuntu-26.04
-    permissions:
-      contents: read
-    outputs:
-      list: ${{ steps.select.outputs.list }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Select the nginx branches
-        id: select
-        env:
-          EVENT: ${{ github.event_name }}
-          INPUT: ${{ inputs.nginx }}
-          BEFORE: ${{ github.event.before }}
-        run: |
-          list='["mainline","stable"]'
-          if [[ $EVENT == workflow_dispatch && $INPUT != both ]]; then
-            list="[\"$INPUT\"]"
-          elif [[ $EVENT == push ]] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            inputs=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- \
-              config 'ngx_*.[ch]' Dockerfile keys)
-            changes=$(git diff -U0 "$BEFORE" "$GITHUB_SHA" -- Dockerfile |
-              grep -E '^[-+]' | grep -Ev '^(\+\+\+|---) ' || true)
-            if [[ $inputs == Dockerfile ]] &&
-              ! grep -Evq '^[-+]ARG NGINX_(MAINLINE|STABLE)=' <<<"$changes"; then
-              branches=()
-              grep -q NGINX_MAINLINE <<<"$changes" && branches+=('"mainline"')
-              grep -q NGINX_STABLE <<<"$changes" && branches+=('"stable"')
-              list="[$(IFS=,; echo "${branches[*]}")]"
-            fi
-          fi
-          echo "list=$list" >> "$GITHUB_OUTPUT"
-          echo "Publishing $list"
-
   # Each nginx branch and architecture is built, tested and pushed by digest on
   # its own native runner. The module in the pushed image comes from the same
   # build stage the tests ran against.
   build:
     name: build (${{ matrix.nginx }} ${{ matrix.arch }})
-    needs: branches
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     permissions:
       contents: read
@@ -92,7 +46,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        nginx: ${{ fromJSON(needs.branches.outputs.list) }}
+        nginx: [mainline, stable]
         arch: [amd64, arm64]
     env:
       # The same cache scopes as the test jobs in ci.yml.
@@ -212,7 +166,7 @@ jobs:
 
   publish:
     name: publish (${{ matrix.nginx }})
-    needs: [branches, build]
+    needs: build
     runs-on: ubuntu-26.04
     permissions:
       contents: write
@@ -223,7 +177,7 @@ jobs:
       # One run at a time: both choose a free tag from the same package list.
       max-parallel: 1
       matrix:
-        nginx: ${{ fromJSON(needs.branches.outputs.list) }}
+        nginx: [mainline, stable]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
