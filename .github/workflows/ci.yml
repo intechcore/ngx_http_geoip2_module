@@ -119,7 +119,9 @@ jobs:
           docker cp "$id:/build/." /build/
           docker rm "$id" >/dev/null
           # The analyzer reads the sources from the checkout, not from the image.
-          sed -i "s|/build/module/|$GITHUB_WORKSPACE/|g" build/compile_commands.json
+          # Both the file field and the relative path in the arguments point there.
+          sed -i -e "s|/build/module/|$GITHUB_WORKSPACE/|g" \
+                 -e "s|\"\\.\\./module/|\"$GITHUB_WORKSPACE/|g" build/compile_commands.json
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
             libmaxminddb-dev libpcre2-dev libssl-dev zlib1g-dev >/dev/null
