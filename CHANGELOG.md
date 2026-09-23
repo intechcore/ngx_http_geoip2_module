@@ -27,6 +27,8 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
   module now also compares the inode and the size. From upstream PR #138 by Felipe Travi.
 
 ### Added
+- The variable option `escape=uri` percent-encodes the value, for example for a request
+  header to an upstream server that rejects non-ASCII bytes. Both modules. Upstream #125.
 - Tests in `tests/` for the http and the stream module: every MMDB data type, lookups over
   IPv4 and IPv6, the default value, `geoip2_proxy`, metadata, the reload cases and reload
   errors, and invalid configuration. They cover 100% of the lines and branches, and CI

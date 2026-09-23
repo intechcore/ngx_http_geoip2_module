@@ -45,8 +45,10 @@ func types() mmdbtype.Map {
 			"uint64":     mmdbtype.Uint64(18446744073709551615),
 			"uint128":    (*mmdbtype.Uint128)(u128),
 			"string":     mmdbtype.String("text"),
-			"map":        mmdbtype.Map{"key": mmdbtype.String("value")},
-			"array":      mmdbtype.Slice{mmdbtype.String("first")},
+			// Non-ASCII and reserved characters for escape=uri.
+			"escape": mmdbtype.String("Ōbu & Co/ü~"),
+			"map":    mmdbtype.Map{"key": mmdbtype.String("value")},
+			"array":  mmdbtype.Slice{mmdbtype.String("first")},
 		},
 	}
 }

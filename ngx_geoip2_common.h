@@ -222,12 +222,13 @@ ngx_geoip2_metadata(ngx_conf_t *cf, ngx_geoip2_db_t *database,
 
 
 /*
- * Parses "$name [default=<value>] [source=$variable] path ...". Sets the
- * default value and the source, and returns the lookup path.
+ * Parses "$name [default=<value>] [source=$variable] [escape=uri] path ...".
+ * Sets the default value, the source and the escape flag, and returns the
+ * lookup path.
  */
 static char *
 ngx_geoip2_variable(ngx_conf_t *cf, ngx_str_t *default_value,
-    ngx_str_t *source, const char ***lookup)
+    ngx_str_t *source, ngx_uint_t *escape, const char ***lookup)
 {
     ngx_str_t     *value, *arg;
     ngx_uint_t     i, idx;
@@ -237,6 +238,7 @@ ngx_geoip2_variable(ngx_conf_t *cf, ngx_str_t *default_value,
 
     ngx_str_null(default_value);
     ngx_str_null(source);
+    *escape = 0;
 
     for (idx = 1; idx < cf->args->nelts; idx++) {
         arg = &value[idx];
@@ -274,6 +276,18 @@ ngx_geoip2_variable(ngx_conf_t *cf, ngx_str_t *default_value,
                 return NGX_CONF_ERROR;
             }
 
+        } else if (arg->len == 10
+                   && ngx_strncmp(arg->data, "escape=uri", 10) == 0)
+        {
+            if (*escape) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "escape has already been declared for \"$%V\"",
+                                   &value[0]);
+                return NGX_CONF_ERROR;
+            }
+
+            *escape = 1;
+
         } else {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "invalid setting \"%V\" for \"$%V\"",
@@ -299,13 +313,46 @@ ngx_geoip2_variable(ngx_conf_t *cf, ngx_str_t *default_value,
 
 
 /*
- * Looks up the address and writes the data at the path to value. Returns
- * NGX_DECLINED when the database holds no usable value there. The database
- * caches the result of the last address.
+ * Percent-encodes each byte of value except letters, digits and "-._~", the
+ * unreserved characters of RFC 3986.
+ */
+static ngx_int_t
+ngx_geoip2_escape_uri(ngx_pool_t *pool, ngx_str_t *value)
+{
+    u_char     *p;
+    uintptr_t   n;
+
+    n = ngx_escape_uri(NULL, value->data, value->len,
+                       NGX_ESCAPE_URI_COMPONENT);
+    if (n == 0) {
+        return NGX_OK;
+    }
+
+    p = ngx_pnalloc(pool, value->len + 2 * n);
+    if (p == NULL) {  /* GCOVR_EXCL_BR_LINE */
+        return NGX_ERROR;  /* GCOVR_EXCL_LINE */
+    }
+
+    (void) ngx_escape_uri(p, value->data, value->len,
+                          NGX_ESCAPE_URI_COMPONENT);
+
+    value->data = p;
+    value->len += 2 * n;
+
+    return NGX_OK;
+}
+
+
+/*
+ * Looks up the address and writes the data at the path to value, escaped
+ * for a URI component if escape is set. Returns NGX_DECLINED when the
+ * database holds no usable value there. The database caches the result of
+ * the last address.
  */
 static ngx_int_t
 ngx_geoip2_lookup(ngx_pool_t *pool, ngx_geoip2_db_t *database,
-    struct sockaddr *sockaddr, const char **path, ngx_str_t *value)
+    struct sockaddr *sockaddr, const char **path, ngx_uint_t escape,
+    ngx_str_t *value)
 {
     int                 mmdb_error;
     u_char             *p;
@@ -417,6 +464,10 @@ ngx_geoip2_lookup(ngx_pool_t *pool, ngx_geoip2_db_t *database,
             break;
         default:
             return NGX_DECLINED;
+    }
+
+    if (escape) {
+        return ngx_geoip2_escape_uri(pool, value);
     }
 
     return NGX_OK;

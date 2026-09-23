@@ -22,6 +22,7 @@ typedef struct {
     ngx_geoip2_db_t          *database;
     const char               **lookup;
     ngx_str_t                default_value;
+    ngx_uint_t               escape;
     ngx_http_complex_value_t source;
 } ngx_http_geoip2_ctx_t;
 
@@ -146,7 +147,7 @@ ngx_http_geoip2_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
     }
 
     rc = ngx_geoip2_lookup(r->pool, geoip2->database, addr.sockaddr,
-                           geoip2->lookup, &val);
+                           geoip2->lookup, geoip2->escape, &val);
 
     if (rc == NGX_ERROR) {  /* GCOVR_EXCL_BR_LINE */
         return NGX_ERROR;  /* GCOVR_EXCL_LINE */
@@ -311,7 +312,7 @@ ngx_http_geoip2_add_variable(ngx_conf_t *cf, ngx_geoip2_db_t *database)
     geoip2->database = database;
 
     rv = ngx_geoip2_variable(cf, &geoip2->default_value, &source,
-                             &geoip2->lookup);
+                             &geoip2->escape, &geoip2->lookup);
     if (rv != NGX_CONF_OK) {
         return rv;
     }
