@@ -2,6 +2,11 @@
 
 [![CI](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml/badge.svg)](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-orange.svg)](LICENSE)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=intechcore_ngx_http_geoip2_module&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=intechcore_ngx_http_geoip2_module)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=intechcore_ngx_http_geoip2_module&metric=coverage)](https://sonarcloud.io/summary/new_code?id=intechcore_ngx_http_geoip2_module)
+[![Duplicated Lines](https://sonarcloud.io/api/project_badges/measure?project=intechcore_ngx_http_geoip2_module&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=intechcore_ngx_http_geoip2_module)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=intechcore_ngx_http_geoip2_module&metric=bugs)](https://sonarcloud.io/summary/new_code?id=intechcore_ngx_http_geoip2_module)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=intechcore_ngx_http_geoip2_module&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=intechcore_ngx_http_geoip2_module)
 
 A maintained fork of [leev/ngx_http_geoip2_module](https://github.com/leev/ngx_http_geoip2_module).
 Upstream has had no commits since 2024-04. This fork adds:
