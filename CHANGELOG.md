@@ -36,6 +36,8 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
   source tarball is verified against the release manager keys in `keys/`.
 - CI on native amd64 and arm64 runners, and publishing of the module image
   `ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n>` with a provenance attestation.
+- GitHub releases with the http and the stream module for amd64 and arm64, with the same tag
+  as the module image, `SHA256SUMS` and a provenance attestation.
 - Renovate for the nginx version and the GitHub Actions, pinned by SHA.
 - SonarCloud analysis in CI with test coverage. A `coverage` build stage compiles both modules
   with gcov and records the compile commands.

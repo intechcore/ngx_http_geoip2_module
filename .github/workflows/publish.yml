@@ -3,7 +3,8 @@ name: Publish
 # Publishes the module image ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n>
 # when a build input changes on master: the module sources, the Dockerfile
 # (for example a Renovate bump of NGINX_VERSION) or the nginx signing keys.
-# <n> counts the builds for one nginx version and starts at 1.
+# <n> counts the builds for one nginx version and starts at 1. A GitHub release
+# with the same tag holds the http and the stream module for amd64 and arm64.
 
 on:
   push:
@@ -92,11 +93,36 @@ jobs:
           path: digests/*
           retention-days: 1
 
+      - name: Extract the module binaries
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: binaries
+          platforms: linux/${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          outputs: type=local,dest=binaries
+
+      - name: Name the binaries by nginx version and architecture
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          nginx=$(awk -F= '/^ARG NGINX_VERSION=/ { print $2; exit }' Dockerfile)
+          for f in binaries/*.so; do
+            mv "$f" "${f%.so}-${nginx}-${ARCH}.so"
+          done
+          ls -l binaries
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: binaries-${{ matrix.arch }}
+          path: binaries/*.so
+          retention-days: 1
+
   publish:
     needs: build
     runs-on: ubuntu-26.04
     permissions:
-      contents: read
+      contents: write
       packages: write
       id-token: write
       attestations: write
@@ -110,6 +136,12 @@ jobs:
           pattern: digest-*
           merge-multiple: true
           path: digests
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: binaries-*
+          merge-multiple: true
+          path: binaries
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -162,3 +194,39 @@ jobs:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.index.outputs.digest }}
           push-to-registry: true
+
+      - name: Write the checksums
+        working-directory: binaries
+        run: sha256sum -- *.so > SHA256SUMS
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: binaries/*.so
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          NGINX: ${{ steps.tag.outputs.nginx }}
+        run: |
+          cat > notes.md <<EOF
+          ngx_http_geoip2_module and ngx_stream_geoip2_module for nginx ${NGINX}, amd64 and arm64.
+
+          The modules are built on Debian trixie with \`--with-compat\`. They load into
+          nginx ${NGINX} from the official \`nginx:${NGINX}-trixie\` image or the nginx.org
+          packages for trixie, and need \`libmaxminddb0\`. A dynamic module loads only into
+          the nginx version it was built for.
+
+          The same http module is in the image \`${IMAGE}:${TAG}\`.
+
+          Verify a download:
+
+          \`\`\`sh
+          sha256sum --check --ignore-missing SHA256SUMS
+          gh attestation verify ngx_http_geoip2_module-${NGINX}-amd64.so --owner intechcore
+          \`\`\`
+          EOF
+          gh release create "$TAG" binaries/*.so binaries/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$TAG" --notes-file notes.md
+          echo "- release [${TAG}](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG})" >> "$GITHUB_STEP_SUMMARY"
