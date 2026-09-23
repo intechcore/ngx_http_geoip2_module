@@ -2,3 +2,4 @@
 .github
 tests/fixtures
 build
+tests/integration/databases

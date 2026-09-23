@@ -1,4 +1,4 @@
-.PHONY: test test-alpine asan coverage module fixtures clean
+.PHONY: test test-alpine integration asan coverage module fixtures clean
 
 TEST_IMAGE ?= ngx_http_geoip2_module:test
 TEST_ALPINE_IMAGE ?= ngx_http_geoip2_module:test-alpine
@@ -18,6 +18,10 @@ test:
 test-alpine:
 	$(BUILD) --target test-alpine -t $(TEST_ALPINE_IMAGE) .
 	tests/run.sh $(TEST_ALPINE_IMAGE)
+
+integration:
+	$(BUILD) --target test -t $(TEST_IMAGE) .
+	tests/integration/run.sh $(TEST_IMAGE)
 
 asan:
 	$(BUILD) --target asan -t $(ASAN_IMAGE) .
