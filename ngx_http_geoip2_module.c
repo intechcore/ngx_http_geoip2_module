@@ -71,13 +71,17 @@ static void ngx_http_geoip2_cleanup(void *data);
 static ngx_int_t ngx_http_geoip2_init(ngx_conf_t *cf);
 
 
-#define FORMAT(fmt, ...) do {                           \
-        p = ngx_palloc(r->pool, NGX_OFF_T_LEN);         \
-        if (p == NULL) {                                \
-            return NGX_ERROR;                           \
-        }                                               \
-        v->len = ngx_sprintf(p, fmt, __VA_ARGS__) - p;  \
-        v->data = p;                                    \
+/* the longest value is a uint128 in hex: "0x" and 32 digits */
+#define NGX_HTTP_GEOIP2_VALUE_LEN  64
+
+#define FORMAT(fmt, ...) do {                                           \
+        p = ngx_palloc(r->pool, NGX_HTTP_GEOIP2_VALUE_LEN);             \
+        if (p == NULL) {                                                \
+            return NGX_ERROR;                                           \
+        }                                                               \
+        v->len = ngx_snprintf(p, NGX_HTTP_GEOIP2_VALUE_LEN, fmt,        \
+                              __VA_ARGS__) - p;                         \
+        v->data = p;                                                    \
 } while (0)
 
 static ngx_command_t  ngx_http_geoip2_commands[] = {

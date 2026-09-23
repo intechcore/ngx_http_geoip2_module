@@ -5,6 +5,9 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
 ## [Unreleased]
 
 ### Fixed
+- A heap overflow in both modules: a uint128 value (34 characters) or a double with 14 or
+  more integer digits went into a buffer of 20 bytes. The buffer now holds 64 bytes, and
+  the write is bounded.
 - The stream module crashed `nginx -t` on an invalid `auto_reload` interval. It passed the
   string by value to `%V`. Upstream fixed the same line in the http module (#90), not in the
   stream module. Found by SonarCloud (c:S5270).
