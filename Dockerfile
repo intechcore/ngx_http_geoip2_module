@@ -10,7 +10,8 @@
 # Stages: build compiles, test adds the module to nginx for tests/run.sh,
 # binaries holds both modules for the GitHub release, module (the default) is
 # the published image. build-alpine, test-alpine and binaries-alpine do the
-# same for the nginx:<version>-alpine image (musl).
+# same for the nginx:<version>-alpine image (musl). asan runs the tests with
+# sanitizers.
 
 # The two nginx branches. Renovate keeps both on the latest release: mainline
 # has an odd minor version, stable an even one. CI builds each of them with
@@ -87,6 +88,43 @@ RUN make clean && \
     bear --output /build/compile_commands.json -- make modules && \
     cp objs/ngx_http_geoip2_module.so objs/ngx_stream_geoip2_module.so /usr/lib/nginx/modules/
 COPY tests/nginx.conf /etc/nginx/nginx.conf
+
+# Sanitizer build, used by CI only. It builds nginx itself and both modules
+# with AddressSanitizer and UndefinedBehaviorSanitizer, with the paths of the
+# official image. NGX_DEBUG_PALLOC makes each pool allocation its own malloc,
+# so ASan also sees an overflow inside a pool block. Each finding aborts the
+# process; tests/run.sh reports it.
+FROM build AS asan
+ARG NGINX_VERSION
+WORKDIR /build/nginx-${NGINX_VERSION}
+RUN make clean && \
+    ./configure \
+        --prefix=/etc/nginx \
+        --sbin-path=/usr/sbin/nginx \
+        --modules-path=/usr/lib/nginx/modules \
+        --conf-path=/etc/nginx/nginx.conf \
+        --error-log-path=/var/log/nginx/error.log \
+        --http-log-path=/var/log/nginx/access.log \
+        --pid-path=/run/nginx.pid \
+        --lock-path=/run/nginx.lock \
+        --http-client-body-temp-path=/var/cache/nginx/client_temp \
+        --http-proxy-temp-path=/var/cache/nginx/proxy_temp \
+        --http-fastcgi-temp-path=/var/cache/nginx/fastcgi_temp \
+        --http-uwsgi-temp-path=/var/cache/nginx/uwsgi_temp \
+        --http-scgi-temp-path=/var/cache/nginx/scgi_temp \
+        --user=nginx --group=nginx \
+        --with-compat --with-stream --add-dynamic-module=../module \
+        --with-cc-opt="-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all -DNGX_DEBUG_PALLOC=1" \
+        --with-ld-opt="-fsanitize=address,undefined" && \
+    make -j"$(nproc)" && \
+    cp objs/nginx /usr/sbin/nginx && \
+    cp objs/ngx_http_geoip2_module.so objs/ngx_stream_geoip2_module.so /usr/lib/nginx/modules/
+COPY tests/nginx.conf /etc/nginx/nginx.conf
+# Leak checks need ptrace, which a container does not allow. nginx frees its
+# pools at exit. The nginx build generates ngx_module_names in nginx and in
+# each dynamic module, which the ODR check reports. The other checks stay on.
+ENV ASAN_OPTIONS=detect_leaks=0:detect_odr_violation=0:abort_on_error=1 \
+    UBSAN_OPTIONS=print_stacktrace=1
 
 # The http and the stream module as files, for docker build --output. The
 # publish workflow attaches them to the GitHub release.

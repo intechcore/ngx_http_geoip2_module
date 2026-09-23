@@ -1,8 +1,9 @@
-.PHONY: test test-alpine coverage module fixtures clean
+.PHONY: test test-alpine asan coverage module fixtures clean
 
 TEST_IMAGE ?= ngx_http_geoip2_module:test
 TEST_ALPINE_IMAGE ?= ngx_http_geoip2_module:test-alpine
 COVERAGE_IMAGE ?= ngx_http_geoip2_module:coverage
+ASAN_IMAGE ?= ngx_http_geoip2_module:asan
 MODULE_IMAGE ?= ngx_http_geoip2_module:local
 
 # The nginx branch to build for: mainline or stable.
@@ -18,6 +19,10 @@ test-alpine:
 	$(BUILD) --target test-alpine -t $(TEST_ALPINE_IMAGE) .
 	tests/run.sh $(TEST_ALPINE_IMAGE)
 
+asan:
+	$(BUILD) --target asan -t $(ASAN_IMAGE) .
+	tests/run.sh $(ASAN_IMAGE)
+
 coverage:
 	$(BUILD) --target coverage -t $(COVERAGE_IMAGE) .
 	tests/coverage.sh $(COVERAGE_IMAGE) build
@@ -30,4 +35,4 @@ fixtures:
 		go run . ..
 
 clean:
-	docker rmi $(TEST_IMAGE) $(TEST_ALPINE_IMAGE) $(COVERAGE_IMAGE) $(MODULE_IMAGE) 2>/dev/null || true
+	docker rmi $(TEST_IMAGE) $(TEST_ALPINE_IMAGE) $(ASAN_IMAGE) $(COVERAGE_IMAGE) $(MODULE_IMAGE) 2>/dev/null || true

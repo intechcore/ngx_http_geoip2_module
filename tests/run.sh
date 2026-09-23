@@ -168,8 +168,18 @@ check_logged() {
   fi
 }
 
+# sanitized <output>: true if a sanitizer of the asan image reported an error.
+sanitized() {
+  grep -qE 'ERROR: AddressSanitizer|runtime error:' <<<"$1"
+}
+
 no_crash() {
-  if docker logs "$container" 2>&1 | grep -q "exited on signal"; then
+  local logs
+  logs=$(docker logs "$container" 2>&1)
+  if sanitized "$logs"; then
+    not_ok "$1: a sanitizer reported an error"
+    grep -E -A20 'ERROR: AddressSanitizer|runtime error:' <<<"$logs" >&2
+  elif grep -q "exited on signal" <<<"$logs"; then
     not_ok "$1: a worker crashed"
   else
     ok "$1: no worker crash"
@@ -191,6 +201,8 @@ rejected() {
     not_ok "$2: $1: accepted"
   elif [[ $rc -eq 139 ]]; then
     not_ok "$2: $1: nginx crashed"
+  elif sanitized "$out"; then
+    not_ok "$2: $1: a sanitizer reported an error: $out"
   elif [[ $out != *"$4"* ]]; then
     not_ok "$2: $1: message missing, got: $out"
   else
