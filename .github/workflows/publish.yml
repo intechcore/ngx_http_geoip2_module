@@ -1,11 +1,12 @@
 name: Publish
 
 # Publishes the module image ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n>
-# when a build input changes on master: the module sources, the Dockerfile
-# (for example a Renovate bump of NGINX_VERSION) or the nginx signing keys.
-# <n> counts the builds for one nginx version and starts at 1. A GitHub release
-# with the same tag holds the http and the stream module for amd64 and arm64,
-# built for the Debian and the Alpine nginx image.
+# and a GitHub release with the same tag, for the mainline and the stable nginx
+# branch. It runs when a build input changes on master: the module sources, the
+# Dockerfile (for example a Renovate bump of an nginx version) or the nginx
+# signing keys. <n> counts the builds for one nginx version and starts at 1.
+# The release holds the http and the stream module for amd64 and arm64, built
+# for the Debian and the Alpine nginx image.
 
 on:
   push:
@@ -16,6 +17,12 @@ on:
       - Dockerfile
       - 'keys/**'
   workflow_dispatch:
+    inputs:
+      nginx:
+        description: nginx branch to publish
+        type: choice
+        options: [both, mainline, stable]
+        default: both
 
 permissions: {}
 
@@ -27,27 +34,75 @@ env:
   IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  # Each architecture is built, tested and pushed by digest on its own native
-  # runner. The module in the pushed image comes from the same build stage the
-  # tests ran against.
+  # A push that only bumps the version of one nginx branch publishes only that
+  # branch. Any other change of a build input publishes both.
+  branches:
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    outputs:
+      list: ${{ steps.select.outputs.list }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select the nginx branches
+        id: select
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT: ${{ inputs.nginx }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          list='["mainline","stable"]'
+          if [[ $EVENT == workflow_dispatch && $INPUT != both ]]; then
+            list="[\"$INPUT\"]"
+          elif [[ $EVENT == push ]] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            inputs=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- \
+              config 'ngx_*.[ch]' Dockerfile keys)
+            changes=$(git diff -U0 "$BEFORE" "$GITHUB_SHA" -- Dockerfile |
+              grep -E '^[-+]' | grep -Ev '^(\+\+\+|---) ' || true)
+            if [[ $inputs == Dockerfile ]] &&
+              ! grep -Evq '^[-+]ARG NGINX_(MAINLINE|STABLE)=' <<<"$changes"; then
+              branches=()
+              grep -q NGINX_MAINLINE <<<"$changes" && branches+=('"mainline"')
+              grep -q NGINX_STABLE <<<"$changes" && branches+=('"stable"')
+              list="[$(IFS=,; echo "${branches[*]}")]"
+            fi
+          fi
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+          echo "Publishing $list"
+
+  # Each nginx branch and architecture is built, tested and pushed by digest on
+  # its own native runner. The module in the pushed image comes from the same
+  # build stage the tests ran against.
   build:
-    name: build (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
+    name: build (${{ matrix.nginx }} ${{ matrix.arch }})
+    needs: branches
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     permissions:
       contents: read
       packages: write
     strategy:
       fail-fast: true
       matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
+        nginx: ${{ fromJSON(needs.branches.outputs.list) }}
+        arch: [amd64, arm64]
+    env:
+      # The same cache scopes as the test jobs in ci.yml.
+      SCOPE: ${{ matrix.nginx == 'stable' && 'stable-' || '' }}${{ matrix.arch }}
+      ALPINE_SCOPE: ${{ matrix.nginx == 'stable' && 'stable-' || '' }}alpine-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Read the nginx version
+        id: nginx
+        env:
+          BRANCH: ${{ matrix.nginx }}
+        run: echo "version=$(scripts/nginx-version.sh "$BRANCH")" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -62,10 +117,11 @@ jobs:
         with:
           context: .
           target: test
+          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
           load: true
           tags: geoip2:test
-          cache-from: type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ env.SCOPE }}
+          cache-to: type=gha,mode=max,scope=${{ env.SCOPE }}
 
       - name: Run the tests
         run: tests/run.sh geoip2:test
@@ -75,10 +131,11 @@ jobs:
         with:
           context: .
           target: test-alpine
+          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
           load: true
           tags: geoip2:test-alpine
-          cache-from: type=gha,scope=alpine-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=alpine-${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ env.ALPINE_SCOPE }}
+          cache-to: type=gha,mode=max,scope=${{ env.ALPINE_SCOPE }}
 
       - name: Run the tests on Alpine
         run: tests/run.sh geoip2:test-alpine
@@ -89,9 +146,10 @@ jobs:
         with:
           context: .
           target: module
+          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
           platforms: linux/${{ matrix.arch }}
           provenance: false
-          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ env.SCOPE }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Save the digest
@@ -103,7 +161,7 @@ jobs:
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: digest-${{ matrix.arch }}
+          name: digest-${{ matrix.nginx }}-${{ matrix.arch }}
           path: digests/*
           retention-days: 1
 
@@ -112,8 +170,9 @@ jobs:
         with:
           context: .
           target: binaries
+          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
           platforms: linux/${{ matrix.arch }}
-          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ env.SCOPE }}
           outputs: type=local,dest=binaries
 
       - name: Extract the Alpine module binaries
@@ -121,38 +180,45 @@ jobs:
         with:
           context: .
           target: binaries-alpine
+          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
           platforms: linux/${{ matrix.arch }}
-          cache-from: type=gha,scope=alpine-${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ env.ALPINE_SCOPE }}
           outputs: type=local,dest=binaries-alpine
 
       - name: Name the binaries by nginx version and architecture
         env:
           ARCH: ${{ matrix.arch }}
+          NGINX: ${{ steps.nginx.outputs.version }}
         run: |
-          nginx=$(awk -F= '/^ARG NGINX_VERSION=/ { print $2; exit }' Dockerfile)
           for f in binaries/*.so; do
-            mv "$f" "${f%.so}-${nginx}-${ARCH}.so"
+            mv "$f" "${f%.so}-${NGINX}-${ARCH}.so"
           done
           for f in binaries-alpine/*.so; do
             base=${f#binaries-alpine/}
-            mv "$f" "binaries/${base%.so}-${nginx}-alpine-${ARCH}.so"
+            mv "$f" "binaries/${base%.so}-${NGINX}-alpine-${ARCH}.so"
           done
           ls -l binaries
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: binaries-${{ matrix.arch }}
+          name: binaries-${{ matrix.nginx }}-${{ matrix.arch }}
           path: binaries/*.so
           retention-days: 1
 
   publish:
-    needs: build
+    name: publish (${{ matrix.nginx }})
+    needs: [branches, build]
     runs-on: ubuntu-26.04
     permissions:
       contents: write
       packages: write
       id-token: write
       attestations: write
+    strategy:
+      # One run at a time: both choose a free tag from the same package list.
+      max-parallel: 1
+      matrix:
+        nginx: ${{ fromJSON(needs.branches.outputs.list) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -160,13 +226,13 @@ jobs:
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: digest-*
+          pattern: digest-${{ matrix.nginx }}-*
           merge-multiple: true
           path: digests
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: binaries-*
+          pattern: binaries-${{ matrix.nginx }}-*
           merge-multiple: true
           path: binaries
 
@@ -183,8 +249,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          BRANCH: ${{ matrix.nginx }}
         run: |
-          nginx=$(awk -F= '/^ARG NGINX_VERSION=/ { print $2; exit }' Dockerfile)
+          nginx=$(scripts/nginx-version.sh "$BRANCH")
           # No package yet on the first run: the list stays empty.
           existing=$(gh api "/orgs/${REPO%%/*}/packages/container/${REPO#*/}/versions" \
             --paginate --jq '.[].metadata.container.tags[]' 2>/dev/null || true)
@@ -201,18 +268,19 @@ jobs:
         env:
           TAG: ${{ steps.tag.outputs.tag }}
           NGINX: ${{ steps.tag.outputs.nginx }}
+          BRANCH: ${{ matrix.nginx }}
         working-directory: digests
         run: |
           # shellcheck disable=SC2046 # one argument per digest file
           docker buildx imagetools create \
-            -t "${IMAGE}:${TAG}" -t "${IMAGE}:${NGINX}" \
+            -t "${IMAGE}:${TAG}" -t "${IMAGE}:${NGINX}" -t "${IMAGE}:${BRANCH}" \
             $(printf "${IMAGE}@sha256:%s " *)
           digest=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" \
             --format '{{json .Manifest}}' | jq -r .digest)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           {
-            echo "## Published"
-            echo "- \`${IMAGE}:${TAG}\`"
+            echo "## Published ${BRANCH}"
+            echo "- \`${IMAGE}:${TAG}\`, also \`:${NGINX}\` and \`:${BRANCH}\`"
             echo "- digest \`${digest}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -235,9 +303,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.tag.outputs.tag }}
           NGINX: ${{ steps.tag.outputs.nginx }}
+          BRANCH: ${{ matrix.nginx }}
         run: |
           cat > notes.md <<EOF
-          ngx_http_geoip2_module and ngx_stream_geoip2_module for nginx ${NGINX}, amd64 and arm64.
+          ngx_http_geoip2_module and ngx_stream_geoip2_module for nginx ${NGINX} (${BRANCH}), amd64 and arm64.
 
           All modules are built with \`--with-compat\`. A dynamic module loads only into the
           nginx version it was built for.
@@ -256,8 +325,14 @@ jobs:
           gh attestation verify ngx_http_geoip2_module-${NGINX}-amd64.so --owner intechcore
           \`\`\`
           EOF
+          # The latest release is the mainline one. gh release download takes it
+          # without a tag.
+          latest=true
+          if [[ $BRANCH == stable ]]; then
+            latest=false
+          fi
           # BSD-2-Clause: a binary distribution carries the license.
           gh release create "$TAG" binaries/*.so binaries/SHA256SUMS LICENSE \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "$TAG" --notes-file notes.md
+            --title "$TAG" --notes-file notes.md --latest="$latest"
           echo "- release [${TAG}](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG})" >> "$GITHUB_STEP_SUMMARY"

@@ -5,20 +5,25 @@ TEST_ALPINE_IMAGE ?= ngx_http_geoip2_module:test-alpine
 COVERAGE_IMAGE ?= ngx_http_geoip2_module:coverage
 MODULE_IMAGE ?= ngx_http_geoip2_module:local
 
+# The nginx branch to build for: mainline or stable.
+NGINX_BRANCH ?= mainline
+NGINX_VERSION ?= $(shell scripts/nginx-version.sh $(NGINX_BRANCH))
+BUILD = docker build --build-arg NGINX_VERSION=$(NGINX_VERSION)
+
 test:
-	docker build --target test -t $(TEST_IMAGE) .
+	$(BUILD) --target test -t $(TEST_IMAGE) .
 	tests/run.sh $(TEST_IMAGE)
 
 test-alpine:
-	docker build --target test-alpine -t $(TEST_ALPINE_IMAGE) .
+	$(BUILD) --target test-alpine -t $(TEST_ALPINE_IMAGE) .
 	tests/run.sh $(TEST_ALPINE_IMAGE)
 
 coverage:
-	docker build --target coverage -t $(COVERAGE_IMAGE) .
+	$(BUILD) --target coverage -t $(COVERAGE_IMAGE) .
 	tests/coverage.sh $(COVERAGE_IMAGE) build
 
 module:
-	docker build --target module -t $(MODULE_IMAGE) .
+	$(BUILD) --target module -t $(MODULE_IMAGE) .
 
 fixtures:
 	docker run --rm -v "$(CURDIR)/tests/fixtures:/w" -w /w/generate golang:1.26-trixie \

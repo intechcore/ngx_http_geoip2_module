@@ -52,8 +52,10 @@ See [CHANGELOG.md](CHANGELOG.md) for the details. Fixes go back upstream where p
 
 ## Installation
 
-A dynamic module loads only into the nginx version it was built for. All prebuilt modules are
-built with `--with-compat` for one nginx version. Renovate follows new nginx releases.
+A dynamic module loads only into the nginx version it was built for. The prebuilt modules are
+built with `--with-compat` for the current version of both nginx branches: mainline (an odd
+minor version, the `nginx:latest` image) and stable (an even minor version, the `nginx:stable`
+image). Renovate follows new nginx releases.
 
 | Source | Modules | Loads into | Needs |
 |---|---|---|---|
@@ -61,34 +63,41 @@ built with `--with-compat` for one nginx version. Renovate follows new nginx rel
 | Release file `*-<nginx>-<arch>.so` | http, stream | `nginx:<nginx>-trixie`, nginx.org packages for trixie | `libmaxminddb0` |
 | Release file `*-<nginx>-alpine-<arch>.so` | http, stream | `nginx:<nginx>-alpine` | `libmaxminddb-libs` |
 
-`<n>` counts the builds for one nginx version. Each image tag has a
+`<n>` counts the builds for one nginx version. The image tag `<nginx>` points to the latest
+build for that nginx version. Each `<nginx>-<n>` tag has a
 [GitHub release](https://github.com/intechcore/ngx_http_geoip2_module/releases) with the same
 name. A release holds the http and the stream module for amd64 and arm64, `SHA256SUMS` and
-`LICENSE`.
+`LICENSE`. The latest release is the mainline one.
 
 ### Docker image
 
-The image holds only `/ngx_http_geoip2_module.so`. Copy it into the nginx image:
+The image holds only `/ngx_http_geoip2_module.so`. Copy it into the nginx image of the same
+version, here mainline:
 
 ```dockerfile
 FROM nginx:1.31.6-trixie
 RUN apt-get update && apt-get install -y --no-install-recommends libmaxminddb0 \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6-6 \
+COPY --from=ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6 \
      /ngx_http_geoip2_module.so /usr/lib/nginx/modules/
 ```
 
-Verify the build provenance of an image:
+For stable, use `nginx:1.30.5-trixie` and `ngx_http_geoip2_module:1.30.5`.
+
+The publish workflow signs a build provenance attestation for each image and release file. It
+states which workflow of this repository built the artifact, and from which commit. A check
+proves that the artifact comes from this CI and nobody changed it later:
 
 ```sh
-gh attestation verify oci://ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6-6 \
+gh attestation verify oci://ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6 \
   --owner intechcore
 ```
 
 ### Release binaries
 
-Download a module from the latest release, check it and install it. For another nginx version,
-pass its tag to `gh release download`. For Alpine, use the `-alpine-` files.
+Download a module from the latest release, check it and install it. For stable or another
+nginx version, pass the release tag to `gh release download`. For Alpine, use the `-alpine-`
+files.
 
 ```sh
 gh release download --repo intechcore/ngx_http_geoip2_module \
@@ -270,12 +279,15 @@ The Dockerfile stages:
 ### Build and test
 
 ```sh
-make test          # build for NGINX_VERSION in the Dockerfile and run tests/run.sh
+make test          # build for nginx mainline and run tests/run.sh
 make test-alpine   # the same for nginx:<nginx>-alpine
 make coverage      # run the tests on the gcov build, fail below 100% coverage
 make module        # build the module image
 make fixtures      # regenerate tests/fixtures/*.mmdb
 ```
+
+Add `NGINX_BRANCH=stable` to build and test for nginx stable, for example
+`make test NGINX_BRANCH=stable`.
 
 `tests/run.sh` starts nginx in the test image and sends every request from inside the container.
 It checks lookups, every data type, metadata, `geoip2_proxy`, `auto_reload` and its errors, and
@@ -289,9 +301,9 @@ coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocat
 
 | Event | What runs |
 |---|---|
-| A pull request | CI builds both modules and runs `tests/run.sh` on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the scripts in `tests/`, Hadolint checks the `Dockerfile`. SonarCloud and CodeQL analyze the code. |
-| A merge to `master` that changes `config`, `ngx_*.c`, `ngx_*.h`, `Dockerfile` or `keys/` | The publish workflow runs the tests again. It then pushes the image `<nginx>-<n>` and creates the GitHub release with the same tag. |
-| A new `nginx:<version>-trixie` image | Renovate opens a pull request that sets the new `NGINX_VERSION` in the `Dockerfile`. Its merge publishes the modules for that nginx version. |
+| A pull request | CI builds both modules and runs `tests/run.sh` for nginx mainline and stable, on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the shell scripts, Hadolint checks the `Dockerfile`. SonarCloud and CodeQL analyze the code. |
+| A merge to `master` that changes `config`, `ngx_*.c`, `ngx_*.h`, `Dockerfile` or `keys/` | The publish workflow runs the tests again. It then pushes the image `<nginx>-<n>` and creates the GitHub release with the same tag, for mainline and stable. A merge that only bumps the version of one branch publishes only that branch. |
+| A new `nginx:<version>-trixie` image | Renovate opens a pull request that sets the new version in the `Dockerfile` (`NGINX_MAINLINE` or `NGINX_STABLE`) and in the README examples. Its merge publishes the modules for that nginx version. |
 
 The image and the release files carry a build provenance attestation.
 

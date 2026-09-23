@@ -12,8 +12,14 @@
 # the published image. build-alpine, test-alpine and binaries-alpine do the
 # same for the nginx:<version>-alpine image (musl).
 
-# renovate: nginx
-ARG NGINX_VERSION=1.31.6
+# The two nginx branches. Renovate keeps both on the latest release: mainline
+# has an odd minor version, stable an even one. CI builds each of them with
+# --build-arg NGINX_VERSION=<version>.
+# renovate: nginx mainline
+ARG NGINX_MAINLINE=1.31.6
+# renovate: nginx stable
+ARG NGINX_STABLE=1.30.5
+ARG NGINX_VERSION=${NGINX_MAINLINE}
 
 FROM nginx:${NGINX_VERSION}-trixie AS build
 ARG NGINX_VERSION

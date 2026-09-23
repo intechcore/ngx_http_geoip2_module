@@ -7,20 +7,71 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "nginx version the module is built for, from the official nginx image tags",
+      "description": "The nginx mainline version the modules are built for, from the official nginx image tags",
       "managerFilePatterns": ["/^Dockerfile$/"],
-      "matchStrings": ["# renovate: nginx\\nARG NGINX_VERSION=(?<currentValue>[\\d.]+)"],
-      "depNameTemplate": "nginx",
+      "matchStrings": ["# renovate: nginx mainline\\nARG NGINX_MAINLINE=(?<currentValue>[\\d.]+)"],
+      "depNameTemplate": "nginx mainline",
+      "packageNameTemplate": "nginx",
+      "datasourceTemplate": "docker",
+      "extractVersionTemplate": "^(?<version>[\\d.]+)-trixie$"
+    },
+    {
+      "customType": "regex",
+      "description": "The nginx stable version the modules are built for, from the official nginx image tags",
+      "managerFilePatterns": ["/^Dockerfile$/"],
+      "matchStrings": ["# renovate: nginx stable\\nARG NGINX_STABLE=(?<currentValue>[\\d.]+)"],
+      "depNameTemplate": "nginx stable",
+      "packageNameTemplate": "nginx",
+      "datasourceTemplate": "docker",
+      "extractVersionTemplate": "^(?<version>[\\d.]+)-trixie$"
+    },
+    {
+      "customType": "regex",
+      "description": "The nginx mainline version in the README examples: images, tarball and module image. Mainline has an odd minor version.",
+      "managerFilePatterns": ["/^README\\.md$/"],
+      "matchStrings": [
+        "nginx:(?<currentValue>\\d+\\.\\d*[13579]\\.\\d+)-",
+        "nginx-(?<currentValue>\\d+\\.\\d*[13579]\\.\\d+)",
+        "ngx_http_geoip2_module:(?<currentValue>\\d+\\.\\d*[13579]\\.\\d+)"
+      ],
+      "depNameTemplate": "nginx mainline",
+      "packageNameTemplate": "nginx",
+      "datasourceTemplate": "docker",
+      "extractVersionTemplate": "^(?<version>[\\d.]+)-trixie$"
+    },
+    {
+      "customType": "regex",
+      "description": "The nginx stable version in the README examples. Stable has an even minor version.",
+      "managerFilePatterns": ["/^README\\.md$/"],
+      "matchStrings": [
+        "nginx:(?<currentValue>\\d+\\.\\d*[02468]\\.\\d+)-",
+        "nginx-(?<currentValue>\\d+\\.\\d*[02468]\\.\\d+)",
+        "ngx_http_geoip2_module:(?<currentValue>\\d+\\.\\d*[02468]\\.\\d+)"
+      ],
+      "depNameTemplate": "nginx stable",
+      "packageNameTemplate": "nginx",
       "datasourceTemplate": "docker",
       "extractVersionTemplate": "^(?<version>[\\d.]+)-trixie$"
     }
   ],
   "packageRules": [
     {
-      "description": "The dockerfile manager reads FROM nginx:${NGINX_VERSION}-trixie through the ARG default. The regex manager above owns that ARG, so this one stays off.",
+      "description": "The dockerfile manager reads FROM nginx:${NGINX_VERSION}-trixie through the ARG default. The regex managers above own the nginx versions, so this one stays off.",
       "matchManagers": ["dockerfile"],
       "matchDepNames": ["nginx"],
       "enabled": false
+    },
+    {
+      "description": "Mainline stays on odd minor versions. One pull request updates the Dockerfile and the README.",
+      "matchDepNames": ["nginx mainline"],
+      "allowedVersions": "/^\\d+\\.\\d*[13579]\\.\\d+$/",
+      "groupName": "nginx mainline"
+    },
+    {
+      "description": "Stable stays on even minor versions. One pull request updates the Dockerfile and the README.",
+      "matchDepNames": ["nginx stable"],
+      "allowedVersions": "/^\\d+\\.\\d*[02468]\\.\\d+$/",
+      "groupName": "nginx stable"
     },
     {
       "description": "The Go generator of the test databases is a dev tool. Update it by hand.",

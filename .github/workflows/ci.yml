@@ -19,7 +19,7 @@ jobs:
       - name: ShellCheck
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
-          scandir: tests
+          scandir: .
           severity: style
 
       - name: Hadolint
@@ -28,36 +28,30 @@ jobs:
           dockerfile: Dockerfile
 
   # Native runners per architecture: the module is compiled and tested without
-  # QEMU emulation, for the Debian and the Alpine nginx image. The Debian jobs
-  # keep the names test (amd64) and test (arm64), which the branch ruleset
-  # requires.
+  # QEMU emulation, for both nginx branches and for the Debian and the Alpine
+  # nginx image. The mainline Debian jobs keep the names test (amd64) and
+  # test (arm64), which the branch ruleset requires.
   test:
-    name: test (${{ matrix.label }})
-    runs-on: ${{ matrix.runner }}
+    name: test (${{ matrix.nginx == 'stable' && 'stable ' || '' }}${{ matrix.os == 'alpine' && 'alpine ' || '' }}${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - label: amd64
-            runner: ubuntu-24.04
-            target: test
-            scope: amd64
-          - label: arm64
-            runner: ubuntu-24.04-arm
-            target: test
-            scope: arm64
-          - label: alpine amd64
-            runner: ubuntu-24.04
-            target: test-alpine
-            scope: alpine-amd64
-          - label: alpine arm64
-            runner: ubuntu-24.04-arm
-            target: test-alpine
-            scope: alpine-arm64
+        nginx: [mainline, stable]
+        os: [debian, alpine]
+        arch: [amd64, arm64]
+    env:
+      CACHE_SCOPE: ${{ matrix.nginx == 'stable' && 'stable-' || '' }}${{ matrix.os == 'alpine' && 'alpine-' || '' }}${{ matrix.arch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Read the nginx version
+        id: nginx
+        env:
+          BRANCH: ${{ matrix.nginx }}
+        run: echo "version=$(scripts/nginx-version.sh "$BRANCH")" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -65,11 +59,12 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          target: ${{ matrix.target }}
+          target: ${{ matrix.os == 'alpine' && 'test-alpine' || 'test' }}
+          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
           load: true
           tags: geoip2:test
-          cache-from: type=gha,scope=${{ matrix.scope }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.scope }}
+          cache-from: type=gha,scope=${{ env.CACHE_SCOPE }}
+          cache-to: type=gha,mode=max,scope=${{ env.CACHE_SCOPE }}
 
       - name: Run the tests
         run: tests/run.sh geoip2:test

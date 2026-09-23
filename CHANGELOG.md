@@ -38,6 +38,10 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
   `ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n>` with a provenance attestation.
 - GitHub releases with the http and the stream module for amd64 and arm64, with the same tag
   as the module image, `SHA256SUMS`, `LICENSE` and a provenance attestation.
+- Builds, tests, images and releases for nginx stable as well as mainline. A Renovate bump of
+  one branch publishes only that branch. The image tag `<nginx>` points to the latest build
+  for that nginx version.
+- Renovate also updates the nginx versions in the README examples.
 - Builds and tests for the `nginx:<version>-alpine` image (musl). The releases hold these
   modules as `*-alpine-<arch>.so`.
 - Renovate for the nginx version and the GitHub Actions, pinned by SHA.
