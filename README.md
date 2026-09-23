@@ -182,7 +182,7 @@ file can have one `geoip2` block per context.
 ### Variables
 
 ```nginx
-$variable_name [default=<value>] [source=$variable_with_ip] <path> ...;
+$variable_name [default=<value>] [source=$variable_with_ip] [escape=uri] <path> ...;
 ```
 
 - `path` is the path of the value in the database record, for example `country iso_code`. An
@@ -191,6 +191,19 @@ $variable_name [default=<value>] [source=$variable_with_ip] <path> ...;
   empty.
 - `source` is a variable that holds the address to look up. Without it, the module uses the
   client address. In `http` that is the address after `geoip2_proxy`.
+- `escape=uri` percent-encodes the value from the database: each byte except letters, digits
+  and `-._~` becomes `%XX`. The `default` value stays as written.
+
+MaxMind databases hold non-ASCII names, such as `Ōbu`. Some servers reject such bytes in a
+request header. Encode the value before you pass it on:
+
+```nginx
+geoip2 /usr/share/GeoIP/GeoLite2-City.mmdb {
+    $geoip2_city escape=uri city names en;
+}
+
+proxy_set_header X-City $geoip2_city;    # Ōbu arrives as %C5%8Cbu
+```
 
 The value of each data type:
 

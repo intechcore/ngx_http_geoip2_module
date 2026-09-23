@@ -26,6 +26,7 @@ TYPES=192.0.2.1
 UNKNOWN=198.51.100.1
 TYPE_VALUES="1 raw 1.50000 -2.25000 -9000000000000000000.00000 16 4000000000 -32 18446744073709551615 0x00000000000000010000000000000002 text first"
 FALLBACKS="MAP MISSING BADPATH RECORD"
+ESCAPED="%C5%8Cbu%20%26%20Co%2F%C3%BC~ text"
 
 read -r -a EXTRA_ARGS <<<"${DOCKER_RUN_ARGS:-}"
 GLOBALS="${NGINX_GLOBALS:-}"
@@ -261,6 +262,12 @@ for module in http stream; do
   rejected "variable that nginx already defines" "$module" \
     'geoip2 /fixtures/a.mmdb { $remote_addr country iso_code; }' \
     'the duplicate "remote_addr" variable'
+  rejected "escape declared twice" "$module" \
+    'geoip2 /fixtures/a.mmdb { $v escape=uri escape=uri country iso_code; }' \
+    'escape has already been declared for "$v"'
+  rejected "unknown escape" "$module" \
+    'geoip2 /fixtures/a.mmdb { $v escape=url country iso_code; }' \
+    'invalid setting "escape=url" for "$v"'
   rejected "metadata without a field" "$module" \
     'geoip2 /fixtures/a.mmdb { $v metadata; }' \
     'invalid number of arguments for metadata "$v"'
@@ -289,6 +296,8 @@ check "same IPv6 address again (cached failure)" FAIL "$(http /v4 -H "X-IP: $IPV
 check "every data type" "$TYPE_VALUES" "$(http /types -H "X-IP: $TYPES")"
 check "map, missing key, invalid path, no path get the default" "$FALLBACKS" \
   "$(http /fallback -H "X-IP: $TYPES")"
+check "escape=uri encodes all but unreserved characters" "$ESCAPED" \
+  "$(http /escape -H "X-IP: $TYPES")"
 check_match "metadata" '^[1-9][0-9]* [1-9][0-9]* [1-9][0-9]*$' "$(http /metadata)"
 check "client address" ZZ "$(http /client)"
 check "client address, path starts with a word of 8 letters" "[]" "$(http /location)"
@@ -313,6 +322,7 @@ check "IPv6 address in an IPv4 database gets the default" FAIL "$(stream 9003 "$
 check "every data type" "$TYPE_VALUES" "$(stream 9005 "$TYPES")"
 check "map, missing key, invalid path, no path get the default" "$FALLBACKS" \
   "$(stream 9006 "$TYPES")"
+check "escape=uri encodes all but unreserved characters" "$ESCAPED" "$(stream 9008 "$TYPES")"
 check_match "metadata" '^[1-9][0-9]* [1-9][0-9]* [1-9][0-9]*$' "$(stream 9007 "$IPV4")"
 check "client address" ZZ "$(stream 9001 "$IPV4")"
 check "client address, path starts with a word of 8 letters" "[]" "$(stream 9004 "$IPV4")"
