@@ -23,7 +23,8 @@ The lookup uses the client address, or an address from any variable. IPv4 and IP
 context.
 
 This is a maintained fork of [leev/ngx_http_geoip2_module](https://github.com/leev/ngx_http_geoip2_module).
-Upstream has had no commits since 2024-04.
+Upstream has had no commits since 2024-04. The fork has moved far from it and develops on its own:
+fixes and features are not sent back upstream.
 
 ## Changes from upstream
 
@@ -49,7 +50,7 @@ Additions:
   Debian and Alpine.
 - Tests for both modules with 100% line and branch coverage, run in CI on every change.
 
-See [CHANGELOG.md](CHANGELOG.md) for the details. Fixes go back upstream where possible.
+See [CHANGELOG.md](CHANGELOG.md) for the details.
 
 ## Installation
 
