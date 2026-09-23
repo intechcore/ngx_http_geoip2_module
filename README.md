@@ -57,7 +57,7 @@ The image holds the http module only. The releases hold both modules.
 
 Each image tag has a [GitHub release](https://github.com/intechcore/ngx_http_geoip2_module/releases)
 with the same name. It holds `ngx_http_geoip2_module-<nginx>-<arch>.so` and
-`ngx_stream_geoip2_module-<nginx>-<arch>.so` for amd64 and arm64, and `SHA256SUMS`.
+`ngx_stream_geoip2_module-<nginx>-<arch>.so` for amd64 and arm64, `SHA256SUMS` and `LICENSE`.
 
 The modules are built on Debian trixie with `--with-compat`. They load into the same nginx version
 from the official `nginx:<version>-trixie` image or the nginx.org packages for trixie. They need

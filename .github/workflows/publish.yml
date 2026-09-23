@@ -226,7 +226,8 @@ jobs:
           gh attestation verify ngx_http_geoip2_module-${NGINX}-amd64.so --owner intechcore
           \`\`\`
           EOF
-          gh release create "$TAG" binaries/*.so binaries/SHA256SUMS \
+          # BSD-2-Clause: a binary distribution carries the license.
+          gh release create "$TAG" binaries/*.so binaries/SHA256SUMS LICENSE \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "$TAG" --notes-file notes.md
           echo "- release [${TAG}](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG})" >> "$GITHUB_STEP_SUMMARY"
