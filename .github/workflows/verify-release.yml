@@ -1,0 +1,49 @@
+name: Verify release
+
+# Verifies the published artifacts the way users take them: the latest
+# release and image of each nginx branch, on Debian and Alpine, amd64 and
+# arm64 (tests/integration/verify-release.sh). It runs after each publish,
+# once a week, by hand, and for a pull request that changes the check. A
+# failure means users get a broken artifact.
+
+on:
+  workflow_run:
+    workflows: [Publish]
+    types: [completed]
+    branches: [master]
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - tests/integration/verify-release.sh
+      - .github/workflows/verify-release.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify (${{ matrix.nginx }} ${{ matrix.os }} ${{ matrix.arch }})
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    permissions:
+      contents: read
+      attestations: read
+    strategy:
+      fail-fast: false
+      matrix:
+        nginx: [mainline, stable]
+        os: [debian, alpine]
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify the published artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ matrix.nginx }}
+          OS: ${{ matrix.os }}
+        run: tests/integration/verify-release.sh "$(scripts/nginx-version.sh "$BRANCH")" "$OS"

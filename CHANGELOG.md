@@ -31,6 +31,8 @@ Changes of this fork. Upstream history is in the git log up to commit `445df24`.
   module now also compares the inode and the size. From upstream PR #138 by Felipe Travi.
 
 ### Added
+- A workflow verifies the published artifacts after each publish and once a week: checksums,
+  license, attestations, and all tests on clean nginx images with the released modules.
 - Integration tests with the MaxMind test databases (real GeoLite2 City, Country and ASN
   schema) and behind proxies (a CDN, a load balancer and an upstream application in docker
   compose), and under load while the database is replaced and nginx reloads, for both
