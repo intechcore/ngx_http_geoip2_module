@@ -1,0 +1,51 @@
+# A proxy topology for tests/integration/run.sh. Each service runs the test
+# image; only geoip loads the modules.
+#
+#   client 172.30.123.10  sends the requests; the trusted CDN in front of front
+#   front  172.30.123.20  a load balancer: adds X-Forwarded-For, and in stream
+#                         takes the client address from PROXY protocol
+#   geoip  172.30.123.30  the modules; trusts client and front
+#   app    172.30.123.40  the upstream: returns the headers it gets
+name: geoip2-integration
+
+x-nginx: &nginx
+  image: ${IMAGE:?set IMAGE to the test image}
+  entrypoint: ["nginx", "-g", "daemon off;", "-c"]
+  volumes:
+    - .:/proxies:ro
+    - ${DATABASES:?set DATABASES}:/databases:ro
+
+services:
+  client:
+    image: ${IMAGE}
+    entrypoint: ["sleep", "infinity"]
+    networks:
+      net:
+        ipv4_address: 172.30.123.10
+
+  front:
+    <<: *nginx
+    command: ["/proxies/front.conf"]
+    networks:
+      net:
+        ipv4_address: 172.30.123.20
+
+  geoip:
+    <<: *nginx
+    command: ["/proxies/geoip.conf"]
+    networks:
+      net:
+        ipv4_address: 172.30.123.30
+
+  app:
+    <<: *nginx
+    command: ["/proxies/app.conf"]
+    networks:
+      net:
+        ipv4_address: 172.30.123.40
+
+networks:
+  net:
+    ipam:
+      config:
+        - subnet: 172.30.123.0/24

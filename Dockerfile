@@ -114,6 +114,7 @@ RUN make clean && \
         --http-scgi-temp-path=/var/cache/nginx/scgi_temp \
         --user=nginx --group=nginx \
         --with-compat --with-stream --add-dynamic-module=../module \
+        --with-http_realip_module --with-stream_realip_module \
         --with-cc-opt="-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all -DNGX_DEBUG_PALLOC=1" \
         --with-ld-opt="-fsanitize=address,undefined" && \
     make -j"$(nproc)" && \

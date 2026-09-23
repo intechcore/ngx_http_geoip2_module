@@ -342,6 +342,11 @@ databases of a fixed commit of [MaxMind-DB](https://github.com/maxmind/MaxMind-D
 their checksums. They have the real GeoLite2 City, Country and ASN schema. The expected values
 come from `mmdblookup` on the same databases.
 
+It then starts a proxy topology with docker compose (`tests/integration/proxies`): a client
+behind a CDN, a load balancer, nginx with the modules and an upstream application. The tests
+check the headers the application gets, `geoip2_proxy` with a recursive `X-Forwarded-For`, the
+stream realip module with PROXY protocol, and that an untrusted client cannot spoof its address.
+
 `make asan` runs the same tests on nginx and both modules built with sanitizers. Each pool
 allocation of nginx is its own `malloc` there, so AddressSanitizer also finds an overflow inside
 a pool block. A sanitizer report fails the tests.
@@ -353,7 +358,7 @@ coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocat
 
 | Event | What runs |
 |---|---|
-| A pull request | CI builds both modules and runs `tests/run.sh` for nginx mainline and stable, on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the shell scripts, Hadolint checks the `Dockerfile`. A sanitizer build runs the tests too, and the integration tests run on Debian and Alpine. SonarCloud and CodeQL analyze the code. |
+| A pull request | CI builds both modules and runs `tests/run.sh` for nginx mainline and stable, on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the shell scripts, Hadolint checks the `Dockerfile`. A sanitizer build runs the tests too, and the integration tests run on Debian, Alpine and the sanitizer build. SonarCloud and CodeQL analyze the code. |
 | A merge to `master` that changes `config`, `ngx_*.c`, `ngx_*.h`, `Dockerfile` or `keys/` | The publish workflow runs the tests again. It then pushes the image `<nginx>-<n>` and creates the GitHub release with the same tag, for mainline and stable. A merge that only bumps the version of one branch publishes only that branch. The build is reproducible: if the modules equal the last release of that nginx version, nothing is published. |
 | A new `nginx:<version>-trixie` image | Renovate opens a pull request that sets the new version in the `Dockerfile` (`NGINX_MAINLINE` or `NGINX_STABLE`) and in the README examples. Its merge publishes the modules for that nginx version. |
 
