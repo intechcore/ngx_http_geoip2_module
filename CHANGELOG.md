@@ -6,6 +6,7 @@ commit `445df24`.
 ## [Unreleased]
 
 ### Security
+- CI lints the workflows with actionlint and audits them with zizmor.
 - The nginx base images are pinned by the digest of their multi-arch index, for both branches,
   Debian and Alpine. The `Dockerfile` takes the full reference in `NGINX_IMAGE` and
   `NGINX_ALPINE_IMAGE`, and the nginx version comes from its tag. Renovate updates the tag and
