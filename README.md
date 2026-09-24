@@ -389,6 +389,11 @@ coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocat
 
 The image and the release files carry a build provenance attestation.
 
+The notes of a release start with a summary: the nginx version move and the `CHANGELOG.md`
+entries of `## [Unreleased]` added since the previous release of the branch.
+`.github/scripts/release-notes.sh` writes it. The file list, the table of systems and the verify
+commands follow.
+
 ### Fuzzing
 
 `fuzz/fuzz_lookup.c` is a libFuzzer target for the lookup code both modules share: the input is

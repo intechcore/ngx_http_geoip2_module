@@ -194,8 +194,11 @@ jobs:
       matrix:
         nginx: [mainline, stable]
     steps:
+      # The full history holds the release tags. The release notes compare
+      # CHANGELOG.md with the previous release.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -317,7 +320,14 @@ jobs:
           # signatures travel with the files.
           cp "$FILES_BUNDLE" "binaries/ngx_http_geoip2_module-${TAG}.intoto.jsonl"
           cp "$IMAGE_BUNDLE" "binaries/ngx_http_geoip2_module-${TAG}-image.intoto.jsonl"
-          cat > notes.md <<EOF
+          # The notes start with what changed since the previous release of
+          # this branch, the newest tag of the same major.minor, from
+          # CHANGELOG.md. See .github/scripts/release-notes.sh.
+          PREV_TAG=$(git tag --sort=-version:refname | grep "^${NGINX%.*}\." | head -1 || true)
+          PREV_TAG="$PREV_TAG" PRODUCT=nginx COMMITS=false .github/scripts/release-notes.sh > notes.md
+          cat >> notes.md <<EOF
+          ## Files
+
           ngx_http_geoip2_module and ngx_stream_geoip2_module for nginx ${NGINX} (${BRANCH}), amd64 and arm64.
 
           All modules are built with \`--with-compat\`. A dynamic module loads only into the
