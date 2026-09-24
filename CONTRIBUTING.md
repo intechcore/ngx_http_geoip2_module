@@ -48,6 +48,13 @@ The required checks must pass before a merge: `lint`, the `test` jobs for mainli
 Debian and Alpine, amd64 and arm64, `asan`, `analyze`, `sonar`, SonarCloud Code Analysis and
 CodeQL. Pull requests are squash-merged once they are green.
 
+## Release notes
+
+The publish workflow writes the summary at the top of each release with
+`.github/scripts/release-notes.sh`: the nginx version move and the entries of `## [Unreleased]`
+in `CHANGELOG.md` added since the previous release of the branch. The file list follows. To give
+a release its own heading, cut a `## [<tag>] - <date>` section, for example `## [1.31.6-14]`.
+
 ## Report a vulnerability
 
 Do not open a public issue. Report it privately, see [SECURITY.md](SECURITY.md).

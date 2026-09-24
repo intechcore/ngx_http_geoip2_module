@@ -32,6 +32,9 @@ commit `445df24`.
   without arguments read past them as well. Both modules.
 
 ### Changed
+- The GitHub release notes start with a summary of what changed since the previous release of
+  the branch: the nginx version move and the new CHANGELOG entries. Before, they listed the files
+  only. `.github/scripts/release-notes.sh` writes the summary.
 - A variable name that a geoip2 block already defines is a configuration error. Before, the
   last definition replaced the first one without a message.
 - A missing database file at an `auto_reload` check is logged as `error`, not `emerg`. The
