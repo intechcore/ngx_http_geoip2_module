@@ -8,6 +8,9 @@ commit `445df24`.
 
 ## [Unreleased]
 
+### Changed
+- CI pins ShellCheck and sets a timeout on every job; CI and Fuzz cancel superseded pull request runs.
+
 ### Security
 - Each release carries the SPDX SBOM of the module image for amd64 and arm64, and the image
   holds a signed SBOM attestation on each platform digest.
