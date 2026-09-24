@@ -42,6 +42,7 @@ jobs:
   build:
     name: build (${{ matrix.nginx }} ${{ matrix.arch }})
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -206,6 +207,7 @@ jobs:
     name: publish (${{ matrix.nginx }})
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       packages: write

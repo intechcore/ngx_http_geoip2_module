@@ -8,9 +8,15 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request makes the run in flight pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -24,6 +30,8 @@ jobs:
         with:
           scandir: .
           severity: style
+          # renovate: datasource=github-releases depName=koalaman/shellcheck
+          version: v0.11.0
 
       - name: Hadolint
         uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
@@ -60,6 +68,7 @@ jobs:
   test:
     name: test (${{ matrix.nginx == 'stable' && 'stable ' || '' }}${{ matrix.os == 'alpine' && 'alpine ' || '' }}${{ matrix.arch }})
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -108,6 +117,7 @@ jobs:
   # UndefinedBehaviorSanitizer (Dockerfile stage asan), nginx mainline.
   asan:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -135,6 +145,7 @@ jobs:
   # -fanalyzer, clang-tidy and cppcheck. A finding fails the job.
   analyze:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -156,6 +167,7 @@ jobs:
   # build, so the tree is copied to /build on the runner.
   sonar:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
