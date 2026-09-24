@@ -6,10 +6,12 @@ COVERAGE_IMAGE ?= ngx_http_geoip2_module:coverage
 ASAN_IMAGE ?= ngx_http_geoip2_module:asan
 MODULE_IMAGE ?= ngx_http_geoip2_module:local
 
-# The nginx branch to build for: mainline or stable.
+# The nginx branch to build for: mainline or stable. The Dockerfile pins its
+# base images, scripts/nginx-image.sh reads them.
 NGINX_BRANCH ?= mainline
-NGINX_VERSION ?= $(shell scripts/nginx-version.sh $(NGINX_BRANCH))
-BUILD = docker build --build-arg NGINX_VERSION=$(NGINX_VERSION)
+NGINX_IMAGE ?= $(shell scripts/nginx-image.sh $(NGINX_BRANCH) debian)
+NGINX_ALPINE_IMAGE ?= $(shell scripts/nginx-image.sh $(NGINX_BRANCH) alpine)
+BUILD = docker build --build-arg NGINX_IMAGE=$(NGINX_IMAGE) --build-arg NGINX_ALPINE_IMAGE=$(NGINX_ALPINE_IMAGE)
 
 test:
 	$(BUILD) --target test -t $(TEST_IMAGE) .

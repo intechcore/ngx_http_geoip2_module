@@ -9,23 +9,11 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "The nginx mainline version the modules are built for, from the official nginx image tags",
+      "description": "The nginx base images in the Dockerfile, as tag and multi-arch index digest. depType is the branch. Docker versioning keeps -trixie and -alpine as the compatibility suffix, so each image stays on its system. An image rebuilt under the same tag gives a digest update.",
       "managerFilePatterns": ["/^Dockerfile$/"],
-      "matchStrings": ["# renovate: nginx mainline\\nARG NGINX_MAINLINE=(?<currentValue>[\\d.]+)"],
-      "depNameTemplate": "nginx mainline",
-      "packageNameTemplate": "nginx",
-      "datasourceTemplate": "docker",
-      "extractVersionTemplate": "^(?<version>[\\d.]+)-trixie$"
-    },
-    {
-      "customType": "regex",
-      "description": "The nginx stable version the modules are built for, from the official nginx image tags",
-      "managerFilePatterns": ["/^Dockerfile$/"],
-      "matchStrings": ["# renovate: nginx stable\\nARG NGINX_STABLE=(?<currentValue>[\\d.]+)"],
-      "depNameTemplate": "nginx stable",
-      "packageNameTemplate": "nginx",
-      "datasourceTemplate": "docker",
-      "extractVersionTemplate": "^(?<version>[\\d.]+)-trixie$"
+      "matchStrings": ["# renovate: branch=(?<depType>mainline|stable) nginx\\nARG [A-Z0-9_]+=nginx:(?<currentValue>\\d+\\.\\d+\\.\\d+-[a-z]+)@(?<currentDigest>sha256:[a-f0-9]{64})"],
+      "depNameTemplate": "nginx",
+      "datasourceTemplate": "docker"
     },
     {
       "customType": "regex",
@@ -37,6 +25,7 @@
         "ngx_http_geoip2_module:(?<currentValue>\\d+\\.\\d*[13579]\\.\\d+)"
       ],
       "depNameTemplate": "nginx mainline",
+      "depTypeTemplate": "mainline",
       "packageNameTemplate": "nginx",
       "datasourceTemplate": "docker",
       "extractVersionTemplate": "^(?<version>[\\d.]+)-trixie$"
@@ -51,6 +40,7 @@
         "ngx_http_geoip2_module:(?<currentValue>\\d+\\.\\d*[02468]\\.\\d+)"
       ],
       "depNameTemplate": "nginx stable",
+      "depTypeTemplate": "stable",
       "packageNameTemplate": "nginx",
       "datasourceTemplate": "docker",
       "extractVersionTemplate": "^(?<version>[\\d.]+)-trixie$"
@@ -68,21 +58,21 @@
   ],
   "packageRules": [
     {
-      "description": "The dockerfile manager reads FROM nginx:${NGINX_VERSION}-trixie through the ARG default. The regex managers above own the nginx versions, so this one stays off.",
+      "description": "The dockerfile manager reads FROM ${NGINX_IMAGE} through the ARG default. The regex manager above owns the nginx images, so this one stays off.",
       "matchManagers": ["dockerfile"],
       "matchDepNames": ["nginx"],
       "enabled": false
     },
     {
-      "description": "Mainline stays on odd minor versions. One pull request updates the Dockerfile and the README.",
-      "matchDepNames": ["nginx mainline"],
-      "allowedVersions": "/^\\d+\\.\\d*[13579]\\.\\d+$/",
+      "description": "Mainline stays on odd minor versions. One pull request updates both Dockerfile images, tag or digest, and the README.",
+      "matchDepTypes": ["mainline"],
+      "allowedVersions": "/^\\d+\\.\\d*[13579]\\.\\d+(-(trixie|alpine))?$/",
       "groupName": "nginx mainline"
     },
     {
-      "description": "Stable stays on even minor versions. One pull request updates the Dockerfile and the README.",
-      "matchDepNames": ["nginx stable"],
-      "allowedVersions": "/^\\d+\\.\\d*[02468]\\.\\d+$/",
+      "description": "Stable stays on even minor versions. One pull request updates both Dockerfile images, tag or digest, and the README.",
+      "matchDepTypes": ["stable"],
+      "allowedVersions": "/^\\d+\\.\\d*[02468]\\.\\d+(-(trixie|alpine))?$/",
       "groupName": "nginx stable"
     },
     {
