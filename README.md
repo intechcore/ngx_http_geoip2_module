@@ -1,7 +1,8 @@
-# ngx_http_geoip2_module (intechcore fork)
+# ngx_http_geoip2_module
 
 [![CI](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml/badge.svg)](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml)
 [![Verify release](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/verify-release.yml/badge.svg)](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/verify-release.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/intechcore/ngx_http_geoip2_module/badge)](https://scorecard.dev/viewer/?uri=github.com/intechcore/ngx_http_geoip2_module)
 [![Release](https://img.shields.io/github/v/release/intechcore/ngx_http_geoip2_module)](https://github.com/intechcore/ngx_http_geoip2_module/releases)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-orange.svg)](LICENSE)
 
@@ -22,9 +23,9 @@ The lookup uses the client address, or an address from any variable. IPv4 and IP
 `ngx_http_geoip2_module` works in the `http` context, `ngx_stream_geoip2_module` in the `stream`
 context.
 
-This is a maintained fork of [leev/ngx_http_geoip2_module](https://github.com/leev/ngx_http_geoip2_module).
-Upstream has had no commits since 2024-04. The fork has moved far from it and develops on its own:
-fixes and features are not sent back upstream.
+Based on [leev/ngx_http_geoip2_module](https://github.com/leev/ngx_http_geoip2_module), which has had
+no commits since 2024-04. This project has moved far from it and develops on its own: fixes and
+features are not sent back upstream.
 
 ## Changes from upstream
 
