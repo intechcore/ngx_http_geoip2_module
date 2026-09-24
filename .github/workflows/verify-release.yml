@@ -7,10 +7,9 @@ name: Verify release
 # test jobs of ci.yml verify what a branch would publish.
 
 on:
-  workflow_run:
-    workflows: [Publish]
-    types: [completed]
-    branches: [master]
+  # Called by publish.yml after each publish. A reusable workflow in place of
+  # workflow_run: it runs in the context of the caller, never of other code.
+  workflow_call:
   schedule:
     - cron: '23 5 * * 1'
   workflow_dispatch:
@@ -21,7 +20,6 @@ permissions:
 jobs:
   verify:
     name: verify (${{ matrix.nginx }} ${{ matrix.os }} ${{ matrix.arch }})
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     permissions:
       contents: read

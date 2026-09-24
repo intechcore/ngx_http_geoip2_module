@@ -1,7 +1,8 @@
 # Security policy
 
-Report a vulnerability privately through GitHub: **Security, Report a vulnerability** in
-this repository. Do not open a public issue.
+Report a vulnerability privately through GitHub:
+https://github.com/intechcore/ngx_http_geoip2_module/security/advisories/new
+(the **Security** tab, **Report a vulnerability**). Do not open a public issue.
 
 We answer within a week. Fixes go into the next module image. Where the issue exists
 upstream too, we also report it to leev/ngx_http_geoip2_module.

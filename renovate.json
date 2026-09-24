@@ -89,11 +89,6 @@
       "description": "The MaxMind test databases change rarely: check monthly. A changed database fails the checksums in databases.sh until someone checks the expected values in tests/integration/run.sh.",
       "matchDepNames": ["MaxMind-DB test data"],
       "schedule": ["* 0-6 1 * *"]
-    },
-    {
-      "description": "The Go generator of the test databases is a dev tool. Update it by hand.",
-      "matchFileNames": ["tests/fixtures/generate/**"],
-      "enabled": false
     }
   ]
 }
