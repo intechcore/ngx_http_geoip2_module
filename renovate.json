@@ -1,11 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "extends": ["github>intechcore/renovate-config"],
   "semanticCommitScope": null,
   "ignorePaths": ["**/node_modules/**", "**/bower_components/**", "**/vendor/**", "**/examples/**"],
-  "automerge": true,
-  "automergeType": "pr",
-  "platformAutomerge": false,
   "customManagers": [
     {
       "customType": "regex",
