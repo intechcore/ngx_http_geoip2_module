@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   lint:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -59,7 +59,7 @@ jobs:
   # the branch ruleset requires.
   test:
     name: test (${{ matrix.nginx == 'stable' && 'stable ' || '' }}${{ matrix.os == 'alpine' && 'alpine ' || '' }}${{ matrix.arch }})
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -107,7 +107,7 @@ jobs:
   # The tests on nginx and both modules built with AddressSanitizer and
   # UndefinedBehaviorSanitizer (Dockerfile stage asan), nginx mainline.
   asan:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -134,7 +134,7 @@ jobs:
   # Static analysis (Dockerfile stage analyze, scripts/analyze.sh): gcc
   # -fanalyzer, clang-tidy and cppcheck. A finding fails the job.
   analyze:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -155,7 +155,7 @@ jobs:
   # needs the compile commands and the nginx build tree at the paths of that
   # build, so the tree is copied to /build on the runner.
   sonar:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

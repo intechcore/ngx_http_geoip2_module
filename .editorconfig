@@ -1,0 +1,32 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.{java,xml,py,c,h}]
+indent_size = 4
+
+# Shell scripts keep the indent they are written with.
+[*.sh]
+indent_size = 2
+
+[{.github/scripts,fuzz}/*.sh]
+indent_size = 4
+
+[{Dockerfile,*.conf}]
+indent_size = 4
+
+# The nginx module config script and Go use tabs.
+[{config,*.go}]
+indent_style = tab
+
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab

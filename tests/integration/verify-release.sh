@@ -47,16 +47,19 @@ tag_image="geoip2-release:$VERSION-$OS-$arch"
 trap 'git -C "$ROOT" worktree remove --force "$work/src" >/dev/null 2>&1 || true
       rm -rf "$work"; docker rmi "$tag_image" >/dev/null 2>&1 || true' EXIT
 
-tag=$(gh release list --repo "$REPO" --limit 100 --json tagName --jq '.[].tagName' |
-  grep -E "^${VERSION//./\\.}-[0-9]+$" | sort -t- -k2 -n | tail -1 || true)
-if [[ -z $tag ]]; then
+# Releases are v<version>-<n>, up to 1.31.6-14 and 1.30.5-7 without the v.
+# The image tag and the file names never carry the v.
+release=$(gh release list --repo "$REPO" --limit 100 --json tagName --jq '.[].tagName' |
+  grep -E "^v?${VERSION//./\\.}-[0-9]+$" | sort -t- -k2 -n | tail -1 || true)
+if [[ -z $release ]]; then
   echo "no release for nginx $VERSION" >&2
   exit 1
 fi
-echo "release $tag, $OS $arch"
+tag=${release#v}
+echo "release $release, $OS $arch"
 suffix="$tag-$OS-$arch"
 
-gh release download "$tag" --repo "$REPO" --dir "$work" \
+gh release download "$release" --repo "$REPO" --dir "$work" \
   --pattern "ngx_http_geoip2_module-$suffix.so" \
   --pattern "ngx_stream_geoip2_module-$suffix.so" \
   --pattern SHA256SUMS --pattern LICENSE
@@ -105,11 +108,11 @@ if [[ $OS == debian ]]; then
 fi
 
 # The tests of the release commit: the tag points to it.
-git -C "$ROOT" fetch -q origin "refs/tags/$tag:refs/tags/$tag" 2>/dev/null || true
-git -C "$ROOT" worktree add -q --detach "$work/src" "$tag"
+git -C "$ROOT" fetch -q origin "refs/tags/$release:refs/tags/$release" 2>/dev/null || true
+git -C "$ROOT" worktree add -q --detach "$work/src" "$release"
 tests="$work/src/tests"
 
-echo "clean $base with the released modules, tests of $tag"
+echo "clean $base with the released modules, tests of $release"
 mkdir "$work/context"
 cp "$work/ngx_http_geoip2_module-$suffix.so" "$work/context/ngx_http_geoip2_module.so"
 cp "$work/ngx_stream_geoip2_module-$suffix.so" "$work/context/ngx_stream_geoip2_module.so"

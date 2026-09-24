@@ -1,14 +1,15 @@
 name: Publish
 
 # Publishes the module image ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n>
-# and a GitHub release with the same tag, for the mainline and the stable nginx
-# branch. It runs when a build input changes on master: the module sources, the
+# and the GitHub release v<nginx>-<n>, for the mainline and the stable nginx
+# branch. Releases up to 1.31.6-14 and 1.30.5-7 carry the tag without v. It
+# runs when a build input changes on master: the module sources, the
 # Dockerfile (for example a Renovate bump of an nginx image, its version or its
 # digest) or the nginx signing keys. <n> counts the builds for one nginx
 # version. The release holds the http and the stream module for amd64 and
-# arm64, built for the Debian and
-# the Alpine nginx image. The build is reproducible: a branch whose modules
-# equal its last release is not published again.
+# arm64, built for the Debian and the Alpine nginx image, and the SBOMs of the
+# image. The build is reproducible: a branch whose modules equal its last
+# release is not published again.
 
 on:
   push:
@@ -40,7 +41,7 @@ jobs:
   # build stage the tests ran against.
   build:
     name: build (${{ matrix.nginx }} ${{ matrix.arch }})
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     permissions:
       contents: read
       packages: write
@@ -135,6 +136,28 @@ jobs:
           path: digests/*
           retention-days: 1
 
+      # The SBOM lists what the pushed module image holds. The publish job
+      # attests it on the platform digest and attaches it to the release.
+      - name: Generate the SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
+          format: spdx-json
+          output-file: sbom/${{ matrix.arch }}.spdx.json
+          upload-artifact: false
+
+      - name: Save the platform digest
+        env:
+          ARCH: ${{ matrix.arch }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: echo "$DIGEST" > "sbom/${ARCH}.digest"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom-${{ matrix.nginx }}-${{ matrix.arch }}
+          path: sbom/
+          retention-days: 1
+
       - name: Extract the module binaries
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -182,7 +205,7 @@ jobs:
   publish:
     name: publish (${{ matrix.nginx }})
     needs: build
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       packages: write
@@ -213,6 +236,12 @@ jobs:
           merge-multiple: true
           path: binaries
 
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: sbom-${{ matrix.nginx }}-*
+          merge-multiple: true
+          path: sbom
+
       - name: Write the checksums
         working-directory: binaries
         run: sha256sum -- *.so > SHA256SUMS
@@ -220,9 +249,11 @@ jobs:
       # The image holds the same modules as the release, so equal checksums
       # mean an equal image too. Only the checksums count, not the file names.
       # A change of the image layout alone needs workflow_dispatch with force.
-      # The next tag is one above the highest number taken by a release, a
+      # The next build number is one above the highest taken by a release, a
       # git tag or a package tag. Git and package tags stay when a release is
-      # deleted, so a number is never used twice.
+      # deleted, so a number is never used twice. Releases and git tags are
+      # v<nginx>-<n> after 1.31.6-14 and 1.30.5-7, bare <nginx>-<n> before:
+      # both forms count. Image tags never carry the v.
       - name: Compare with the last release
         id: compare
         env:
@@ -231,37 +262,47 @@ jobs:
           FORCE: ${{ inputs.force }}
         run: |
           nginx=$(scripts/nginx-version.sh "$BRANCH")
-          last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 \
-            --json tagName --jq '.[].tagName' | sed -n "s/^${nginx}-//p" | sort -n | tail -1)
+          pattern="^v?${nginx//./\\.}-[0-9]+$"
           # Each call on its own line, so a failed request fails the step.
+          releases=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 \
+            --json tagName --jq '.[].tagName')
+          last_release=$(grep -E "$pattern" <<< "$releases" | sort -t- -k2 -n | tail -1 || true)
           tags=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${nginx}-" \
+            --jq '.[].ref | sub("^refs/tags/"; "")')
+          tags+=$'\n'$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/v${nginx}-" \
             --jq '.[].ref | sub("^refs/tags/"; "")')
           tags+=$'\n'$(gh api "/orgs/${GITHUB_REPOSITORY_OWNER}/packages/container/${GITHUB_REPOSITORY#*/}/versions" \
             --paginate --jq '.[].metadata.container.tags[]')
-          taken=$(printf '%s\n' "${nginx}-${last:-0}" "$tags" |
-            sed -n "s/^${nginx}-\([0-9][0-9]*\)$/\1/p" | sort -n | tail -1)
+          taken=$(printf '%s\n' "$releases" "$tags" | grep -E "$pattern" |
+            sed 's/.*-//' | sort -n | tail -1 || true)
           changed=true
-          if [[ $FORCE != true && -n $last ]] &&
-            gh release download "$nginx-$last" --repo "$GITHUB_REPOSITORY" \
+          if [[ $FORCE != true && -n $last_release ]] &&
+            gh release download "$last_release" --repo "$GITHUB_REPOSITORY" \
               --pattern SHA256SUMS --output last.sums --clobber &&
             [[ $(cut -d' ' -f1 last.sums | sort) == $(cut -d' ' -f1 binaries/SHA256SUMS | sort) ]]; then
             changed=false
             echo "## ${BRANCH}: unchanged" >> "$GITHUB_STEP_SUMMARY"
-            echo "The modules equal the release $nginx-$last. Nothing is published." >> "$GITHUB_STEP_SUMMARY"
+            echo "The modules equal the release $last_release. Nothing is published." >> "$GITHUB_STEP_SUMMARY"
           fi
-          tag="$nginx-$(( taken + 1 ))"
+          tag="$nginx-$(( ${taken:-0} + 1 ))"
           # Never attach a release to an existing tag: gh would reuse its commit.
-          if [[ $changed == true ]] &&
-            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" > /dev/null 2>&1; then
-            echo "::error::tag ${tag} already exists"
-            exit 1
+          # Immutable releases cannot take assets later, so a release that
+          # exists already fails here instead of in the upload.
+          if [[ $changed == true ]]; then
+            for ref in "$tag" "v$tag"; do
+              if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${ref}" > /dev/null 2>&1 ||
+                gh release view "$ref" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+                echo "::error::tag or release ${ref} already exists"
+                exit 1
+              fi
+            done
           fi
           {
             echo "changed=$changed"
             echo "nginx=$nginx"
             echo "tag=$tag"
           } >> "$GITHUB_OUTPUT"
-          echo "Last release $nginx-${last:-none}, highest taken $nginx-${taken}, changed: $changed, next: $tag"
+          echo "Last release ${last_release:-none}, highest taken ${nginx}-${taken:-0}, changed: $changed, next: v$tag"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         if: steps.compare.outputs.changed == 'true'
@@ -315,6 +356,31 @@ jobs:
           subject-digest: ${{ steps.index.outputs.digest }}
           push-to-registry: true
 
+      - name: Read the platform digests
+        id: platform
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          {
+            echo "amd64=$(cat sbom/amd64.digest)"
+            echo "arm64=$(cat sbom/arm64.digest)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        if: steps.compare.outputs.changed == 'true'
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.platform.outputs.amd64 }}
+          sbom-path: sbom/amd64.spdx.json
+          push-to-registry: true
+
+      - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        if: steps.compare.outputs.changed == 'true'
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.platform.outputs.arm64 }}
+          sbom-path: sbom/arm64.spdx.json
+          push-to-registry: true
+
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         id: attest-files
         if: steps.compare.outputs.changed == 'true'
@@ -331,15 +397,20 @@ jobs:
           FILES_BUNDLE: ${{ steps.attest-files.outputs.bundle-path }}
           IMAGE_BUNDLE: ${{ steps.attest-image.outputs.bundle-path }}
         run: |
-          # The signed provenance bundles go into the release too, so the
-          # signatures travel with the files.
+          # The signed provenance bundles and the SBOMs go into the release
+          # too, so the signatures travel with the files.
           cp "$FILES_BUNDLE" "binaries/ngx_http_geoip2_module-${TAG}.intoto.jsonl"
           cp "$IMAGE_BUNDLE" "binaries/ngx_http_geoip2_module-${TAG}-image.intoto.jsonl"
+          for arch in amd64 arm64; do
+            cp "sbom/${arch}.spdx.json" "binaries/ngx_http_geoip2_module-${TAG}-${arch}.spdx.json"
+          done
           # The notes start with what changed since the previous release of
-          # this branch, the newest tag of the same major.minor, from
-          # CHANGELOG.md. See .github/scripts/release-notes.sh.
-          PREV_TAG=$(git tag --sort=-version:refname | grep "^${NGINX%.*}\." | head -1 || true)
-          PREV_TAG="$PREV_TAG" PRODUCT=nginx COMMITS=false .github/scripts/release-notes.sh > notes.md
+          # this branch, the newest tag of the same major.minor, with or
+          # without v, from CHANGELOG.md. See .github/scripts/release-notes.sh.
+          series=${NGINX%.*}
+          PREV_TAG=$(git tag | sed -n -E "s/^(v?)(${series//./\\.}\.[0-9]+-[0-9]+)$/\2 \1\2/p" |
+            sort -V -k1,1 | tail -1 | cut -d' ' -f2 || true)
+          TAG="v$TAG" PREV_TAG="$PREV_TAG" PRODUCT=nginx COMMITS=false .github/scripts/release-notes.sh > notes.md
           cat >> notes.md <<EOF
           ## Files
 
@@ -353,7 +424,8 @@ jobs:
           | \`*-${TAG}-debian-<arch>.so\` | Debian trixie (glibc) | \`nginx:${NGINX}-trixie\`, nginx.org packages for trixie | \`libmaxminddb0\` |
           | \`*-${TAG}-alpine-<arch>.so\` | Alpine (musl) | \`nginx:${NGINX}-alpine\` | \`libmaxminddb-libs\` |
 
-          The same Debian modules are in the image \`${IMAGE}:${TAG}\`.
+          The same Debian modules are in the image \`${IMAGE}:${TAG}\`. The
+          \`*.spdx.json\` files are its SBOMs per architecture.
 
           Verify a download:
 
@@ -368,11 +440,14 @@ jobs:
           if [[ $BRANCH == stable ]]; then
             latest=false
           fi
-          # BSD-2-Clause: a binary distribution carries the license.
-          gh release create "$TAG" binaries/*.so binaries/*.intoto.jsonl binaries/SHA256SUMS LICENSE \
+          # BSD-2-Clause: a binary distribution carries the license. One call
+          # creates the release with all files: an immutable release takes no
+          # upload afterwards.
+          gh release create "v$TAG" binaries/*.so binaries/*.intoto.jsonl binaries/*.spdx.json \
+            binaries/SHA256SUMS LICENSE \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "$TAG" --notes-file notes.md --latest="$latest"
-          echo "- release [${TAG}](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG})" >> "$GITHUB_STEP_SUMMARY"
+            --title "v$TAG" --notes-file notes.md --latest="$latest"
+          echo "- release [v${TAG}](https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${TAG})" >> "$GITHUB_STEP_SUMMARY"
 
   # Checks the published artifacts the way users take them.
   verify:

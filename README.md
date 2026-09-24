@@ -69,10 +69,11 @@ and image rebuilds.
 | Release file `*-<nginx>-<n>-alpine-<arch>.so` | http, stream | `nginx:<nginx>-alpine` | `libmaxminddb-libs` |
 
 `<n>` counts the builds for one nginx version. The image tag `<nginx>` points to the latest
-build for that nginx version. Each `<nginx>-<n>` tag has a
-[GitHub release](https://github.com/intechcore/ngx_http_geoip2_module/releases) with the same
-name. A release holds the http and the stream module for amd64 and arm64, `SHA256SUMS` and
-`LICENSE`. The latest release is the mainline one.
+build for that nginx version. Each image tag `<nginx>-<n>` has the
+[GitHub release](https://github.com/intechcore/ngx_http_geoip2_module/releases) `v<nginx>-<n>`.
+Releases up to `1.31.6-14` and `1.30.5-7` carry the tag without the `v`. A release holds the
+http and the stream module for amd64 and arm64, `SHA256SUMS`, `LICENSE`, the provenance bundles
+and the SBOMs of the image. The latest release is the mainline one.
 
 ### Docker image
 
@@ -97,6 +98,10 @@ proves that the artifact comes from this CI and nobody changed it later:
 gh attestation verify oci://ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6 \
   --owner intechcore
 ```
+
+Releases after `1.31.6-14` and `1.30.5-7` also carry an SPDX SBOM of the image per architecture,
+attested on the platform digest. Verify it with
+`--predicate-type https://spdx.dev/Document/v2.3` on the platform digest.
 
 ### Release binaries
 
@@ -382,7 +387,7 @@ coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocat
 | Event | What runs |
 |---|---|
 | A pull request | CI builds both modules and runs `tests/run.sh` for nginx mainline and stable, on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the shell scripts, Hadolint checks the `Dockerfile`. The integration tests run in each of these jobs, and a sanitizer build runs both test sets too. gcc -fanalyzer, clang-tidy, cppcheck, SonarCloud and CodeQL analyze the code. |
-| A merge to `master` that changes `config`, `ngx_*.c`, `ngx_*.h`, `Dockerfile` or `keys/` | The publish workflow runs the tests again. It then pushes the image `<nginx>-<n>` and creates the GitHub release with the same tag, for mainline and stable. The build is reproducible: a branch whose modules equal its last release is not published again. |
+| A merge to `master` that changes `config`, `ngx_*.c`, `ngx_*.h`, `Dockerfile` or `keys/` | The publish workflow runs the tests again. It then pushes the image `<nginx>-<n>` with its SBOMs and creates the GitHub release `v<nginx>-<n>`, for mainline and stable. The build is reproducible: a branch whose modules equal its last release is not published again. |
 | A publish, and once a week | The verify workflow takes the latest release and image of each nginx branch as a user does. It checks `SHA256SUMS`, `LICENSE` and the attestations, and that the image holds the release modules. It then runs `tests/run.sh` and the integration tests on a clean `nginx:<version>-trixie` and `nginx:<version>-alpine` image with the released modules, on amd64 and arm64. |
 | A new `nginx:<version>-trixie` or `-alpine` image | Renovate opens one pull request per branch. It sets the new tag and digest of the nginx images in the `Dockerfile` and the new version in the README examples. Its merge publishes the modules for that nginx version. |
 | An nginx image rebuilt under the same tag | Renovate opens a pull request with the new digest. Its merge runs the publish workflow, which publishes only if the modules changed. |
@@ -428,6 +433,13 @@ that is not in `keys/`, the build fails on purpose. To fix it:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md): build and test, the rules for tests, commits and pull
 requests. Report vulnerabilities privately, see [SECURITY.md](SECURITY.md).
+
+## Disclaimer
+
+This software is provided "as is", without warranty of any kind, as the LICENSE states. Use it at
+your own risk. Intechcore GmbH is not liable for damage from its use, as far as the law allows. It
+is published free of charge, outside of any commercial offering, with no obligation to support it.
+Security reports are welcome, see [SECURITY.md](SECURITY.md).
 
 ## License
 
