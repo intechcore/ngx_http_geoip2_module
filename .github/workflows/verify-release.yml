@@ -20,7 +20,7 @@ permissions:
 jobs:
   verify:
     name: verify (${{ matrix.nginx }} ${{ matrix.os }} ${{ matrix.arch }})
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     permissions:
       contents: read
       attestations: read
