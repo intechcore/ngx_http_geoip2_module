@@ -1,0 +1,93 @@
+name: Fuzz
+
+# Runs the libFuzzer targets in fuzz/ in Debian 13, with the libmaxminddb the
+# images ship: on pull requests that change the module for five minutes, and
+# weekly for half an hour, with AddressSanitizer (plus LeakSanitizer) and
+# UndefinedBehaviorSanitizer. The corpus grows in the Actions cache from run to
+# run. A finding fails the job; the input that triggers it is an artifact.
+
+on:
+  pull_request:
+    paths:
+      - 'ngx_*.[ch]'
+      - config
+      - 'fuzz/**'
+      - .github/workflows/fuzz.yml
+  schedule:
+    - cron: '41 4 * * 2'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  fuzz:
+    name: fuzz (${{ matrix.sanitizer }})
+    runs-on: ubuntu-24.04
+    container: debian:trixie@sha256:9cc080028c43b27d2074d63a5f9caf7166d731494965616c1a6d2827a004585c
+    permissions:
+      contents: read
+    concurrency:
+      group: fuzz-${{ github.ref }}-${{ matrix.sanitizer }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sanitizer: address
+            flags: -fsanitize=address
+          - sanitizer: undefined
+            flags: -fsanitize=undefined -fno-sanitize-recover=undefined
+    env:
+      SECONDS_TO_FUZZ: ${{ github.event_name == 'pull_request' && 300 || 1800 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the toolchain
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends binutils ca-certificates clang \
+            curl gnupg gpgv libclang-rt-dev libmaxminddb-dev make
+
+      - name: Build the fuzz targets
+        env:
+          SANITIZER_FLAGS: ${{ matrix.flags }}
+        run: |
+          export CC=clang CXX=clang++ OUT="$PWD/out" LIB_FUZZING_ENGINE=-fsanitize=fuzzer
+          export CFLAGS="-O1 -g -fno-omit-frame-pointer $SANITIZER_FLAGS -fsanitize=fuzzer-no-link"
+          export CXXFLAGS="$CFLAGS"
+          fuzz/build.sh
+
+      - name: Restore the corpus
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: corpus
+          key: fuzz-corpus-${{ matrix.sanitizer }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.sanitizer }}-
+
+      - name: Fuzz
+        run: |
+          mkdir -p corpus findings
+          for target in out/fuzz_*; do
+            [ -x "$target" ] || continue
+            name=$(basename "$target")
+            mkdir -p "corpus/$name"
+            "$target" -max_total_time="$SECONDS_TO_FUZZ" -print_final_stats=1 \
+              -artifact_prefix="findings/$name-" "corpus/$name" tests/fixtures
+          done
+
+      - name: Save the corpus
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: corpus
+          key: fuzz-corpus-${{ matrix.sanitizer }}-${{ github.run_id }}
+
+      - name: Keep the findings
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-findings-${{ matrix.sanitizer }}
+          path: findings/
+          if-no-files-found: ignore
