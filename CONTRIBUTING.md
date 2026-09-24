@@ -26,6 +26,9 @@ test suites.
 Fuzzing: `fuzz/fuzz_lookup.c` is a libFuzzer target for the shared lookup code. CI runs it on each
 pull request that changes the module. The README section "Fuzzing" shows how to run it locally.
 
+CI runs ShellCheck, Hadolint, actionlint, zizmor, the `test` jobs for mainline and stable on
+Debian and Alpine, amd64 and arm64, `asan`, `analyze`, `sonar` and CodeQL for every pull request.
+
 ## Tests
 
 1. New behavior comes with tests in `tests/run.sh`, for the http and the stream module where both
@@ -38,23 +41,26 @@ pull request that changes the module. The README section "Fuzzing" shows how to 
 
 ## Pull requests
 
-1. Keep one change per pull request.
-2. Write commit messages as [Conventional Commits](https://www.conventionalcommits.org/):
-   `fix: ...`, `feat: ...`, `test: ...`, `ci: ...`, `docs: ...`.
-3. Sign your commits. The default branch `master` accepts verified signatures only.
-4. Update the README and the CHANGELOG with the change. Write the CHANGELOG entry for users.
+1. Branch from the default branch `master` as `type/description`, for example
+   `fix/empty-metadata`.
+2. Keep one change per pull request. New behavior comes with tests; a bug fix adds a test that
+   fails without it.
+3. Write commit messages as [Conventional Commits](https://www.conventionalcommits.org/) without a
+   scope: `feat: ...`, `fix: ...`, `docs: ...`, `refactor: ...`, `test: ...`, `build: ...`,
+   `ci: ...`, `chore: ...`.
+4. Sign your commits. The default branch accepts verified signatures only.
+5. Add an entry under `## [Unreleased]` in `CHANGELOG.md`, written for users: the release notes
+   quote it. Update the README when behavior or configuration changes.
 
-The required checks must pass before a merge: `lint`, the `test` jobs for mainline and stable on
-Debian and Alpine, amd64 and arm64, `asan`, `analyze`, `sonar`, SonarCloud Code Analysis and
-CodeQL. Pull requests are squash-merged once they are green.
+Pull requests are squash-merged once all required checks are green.
 
-## Release notes
+## Releases
 
-The publish workflow writes the summary at the top of each release with
-`.github/scripts/release-notes.sh`: the nginx version move and the entries of `## [Unreleased]`
-in `CHANGELOG.md` added since the previous release of the branch. The file list follows. To give
-a release its own heading, cut a `## [<tag>] - <date>` section, for example `## [1.31.6-14]`.
+Releases are automatic when a build input changes: the module sources, `config`, the
+`Dockerfile` or `keys/`. The publish workflow skips a branch whose modules equal its last
+release. The notes take the Unreleased entries added since the previous release of the branch,
+see `.github/scripts/release-notes.sh`. To give a release its own heading, cut a
+`## [<nginx>-<n>] - <date>` section, for example `## [1.31.6-15]`.
 
-## Report a vulnerability
-
-Do not open a public issue. Report it privately, see [SECURITY.md](SECURITY.md).
+Keep `## [Unreleased]` on top of `CHANGELOG.md`. Its entries stay there across releases: the
+notes compare it with the previous release, so no per-release section is needed.

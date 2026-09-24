@@ -1,11 +1,16 @@
 # Changelog
 
+All notable changes to this project are documented in this file. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
 Changes of this project. The history of leev/ngx_http_geoip2_module is in the git log up to
 commit `445df24`.
 
 ## [Unreleased]
 
 ### Security
+- Each release carries the SPDX SBOM of the module image for amd64 and arm64, and the image
+  holds a signed SBOM attestation on each platform digest.
 - CI lints the workflows with actionlint and audits them with zizmor.
 - The nginx base images are pinned by the digest of their multi-arch index, for both branches,
   Debian and Alpine. The `Dockerfile` takes the full reference in `NGINX_IMAGE` and
@@ -35,6 +40,11 @@ commit `445df24`.
   without arguments read past them as well. Both modules.
 
 ### Changed
+- Releases and their git tags are named `v<nginx>-<n>` from the next release on, for example
+  `v1.31.6-15`. Image tags and file names keep `<nginx>-<n>`. The build counter counts tags
+  and releases with and without the `v`.
+- The repository gained `.editorconfig`, a disclaimer in the README, and SECURITY.md and
+  CONTRIBUTING.md in the shared layout. CI runs on `ubuntu-latest` and `ubuntu-24.04-arm`.
 - The GitHub release notes start with a summary of what changed since the previous release of
   the branch: the nginx version move and the new CHANGELOG entries. Before, they listed the files
   only. `.github/scripts/release-notes.sh` writes the summary.
