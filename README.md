@@ -58,7 +58,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the details.
 A dynamic module loads only into the nginx version it was built for. The prebuilt modules are
 built with `--with-compat` for the current version of both nginx branches: mainline (an odd
 minor version, the `nginx:latest` image) and stable (an even minor version, the `nginx:stable`
-image). Renovate follows new nginx releases.
+image). The `Dockerfile` pins the nginx images by digest. Renovate follows new nginx releases
+and image rebuilds.
 
 | Source | Modules | Loads into | Needs |
 |---|---|---|---|
@@ -337,6 +338,13 @@ make fixtures      # regenerate tests/fixtures/*.mmdb
 Add `NGINX_BRANCH=stable` to build and test for nginx stable, for example
 `make test NGINX_BRANCH=stable`.
 
+The `Dockerfile` pins the nginx base images as `nginx:<version>-<system>@sha256:<digest>`, the
+digest of the multi-arch index. The `ARG` defaults `NGINX_IMAGE` and `NGINX_ALPINE_IMAGE` are
+mainline. `NGINX_STABLE_IMAGE` and `NGINX_STABLE_ALPINE_IMAGE` hold stable. The nginx version comes
+from the tag. `scripts/nginx-image.sh` and `scripts/nginx-version.sh` read these lines for the
+Makefile and the workflows. The Debian and the Alpine image of a branch must hold the same nginx
+version, or the build fails.
+
 `tests/run.sh` starts nginx in the test image and sends every request from inside the container.
 It checks lookups, every data type, metadata, `geoip2_proxy`, `auto_reload` and its errors, and
 every configuration error. The stream checks send the client address in a PROXY protocol header.
@@ -375,7 +383,8 @@ coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocat
 | A pull request | CI builds both modules and runs `tests/run.sh` for nginx mainline and stable, on Debian and Alpine, on amd64 and arm64 runners. ShellCheck checks the shell scripts, Hadolint checks the `Dockerfile`. The integration tests run in each of these jobs, and a sanitizer build runs both test sets too. gcc -fanalyzer, clang-tidy, cppcheck, SonarCloud and CodeQL analyze the code. |
 | A merge to `master` that changes `config`, `ngx_*.c`, `ngx_*.h`, `Dockerfile` or `keys/` | The publish workflow runs the tests again. It then pushes the image `<nginx>-<n>` and creates the GitHub release with the same tag, for mainline and stable. The build is reproducible: a branch whose modules equal its last release is not published again. |
 | A publish, and once a week | The verify workflow takes the latest release and image of each nginx branch as a user does. It checks `SHA256SUMS`, `LICENSE` and the attestations, and that the image holds the release modules. It then runs `tests/run.sh` and the integration tests on a clean `nginx:<version>-trixie` and `nginx:<version>-alpine` image with the released modules, on amd64 and arm64. |
-| A new `nginx:<version>-trixie` image | Renovate opens a pull request that sets the new version in the `Dockerfile` (`NGINX_MAINLINE` or `NGINX_STABLE`) and in the README examples. Its merge publishes the modules for that nginx version. |
+| A new `nginx:<version>-trixie` or `-alpine` image | Renovate opens one pull request per branch. It sets the new tag and digest of the nginx images in the `Dockerfile` and the new version in the README examples. Its merge publishes the modules for that nginx version. |
+| An nginx image rebuilt under the same tag | Renovate opens a pull request with the new digest. Its merge runs the publish workflow, which publishes only if the modules changed. |
 
 The image and the release files carry a build provenance attestation.
 

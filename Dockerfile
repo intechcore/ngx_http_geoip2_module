@@ -14,16 +14,26 @@
 # same for the nginx:<version>-alpine image (musl). asan runs the tests with
 # sanitizers, analyze runs the static analyzers.
 
-# The two nginx branches. Renovate keeps both on the latest release: mainline
-# has an odd minor version, stable an even one. CI builds each of them with
-# --build-arg NGINX_VERSION=<version>.
-# renovate: nginx mainline
-ARG NGINX_MAINLINE=1.31.6
-# renovate: nginx stable
-ARG NGINX_STABLE=1.30.5
-ARG NGINX_VERSION=${NGINX_MAINLINE}
+# The nginx base images, pinned by the digest of their multi-arch index. The
+# defaults are mainline, an odd minor version. The stable images, an even minor
+# version, are listed below them. scripts/nginx-image.sh reads these lines, and
+# CI builds stable with --build-arg NGINX_IMAGE and NGINX_ALPINE_IMAGE. Renovate
+# updates the tag and the digest, one pull request per branch.
+# renovate: branch=mainline nginx
+ARG NGINX_IMAGE=nginx:1.31.6-trixie@sha256:908dc23e643a1447dbfb2e189ed268bfde6a51a5bf9a34d3dd3440a24f58ccf7
+# renovate: branch=mainline nginx
+ARG NGINX_ALPINE_IMAGE=nginx:1.31.6-alpine@sha256:d10753d9289b8e3f884386351f73554ce72b631378949deddd75e83ee296c427
+# renovate: branch=stable nginx
+ARG NGINX_STABLE_IMAGE=nginx:1.30.5-trixie@sha256:b972f831f200b19ef0767938224f9711e74cd783718738cd7405d5cabf75c442
+# renovate: branch=stable nginx
+ARG NGINX_STABLE_ALPINE_IMAGE=nginx:1.30.5-alpine@sha256:bf3201ab56f23e5954646379c775d511fc466e9f11376d9725361064ad07ed35
 
-FROM nginx:${NGINX_VERSION}-trixie AS build
+# The nginx version comes from the tag of NGINX_IMAGE:
+# nginx:1.31.6-trixie@sha256:... gives 1.31.6.
+ARG NGINX_TAG=${NGINX_IMAGE#*:}
+ARG NGINX_VERSION=${NGINX_TAG%%-*}
+
+FROM ${NGINX_IMAGE} AS build
 ARG NGINX_VERSION
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -62,7 +72,7 @@ RUN ./configure --with-compat --with-stream --add-dynamic-module=../module && \
     make modules && \
     cp objs/ngx_http_geoip2_module.so objs/ngx_stream_geoip2_module.so /build/
 
-FROM nginx:${NGINX_VERSION}-trixie AS test
+FROM ${NGINX_IMAGE} AS test
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libmaxminddb0 && \
@@ -145,9 +155,15 @@ FROM scratch AS binaries
 COPY --from=build /build/ngx_http_geoip2_module.so /build/ngx_stream_geoip2_module.so /
 
 # The same modules for the official nginx:<version>-alpine image, built against
-# musl. The nginx source is the tarball the build stage verified.
-FROM nginx:${NGINX_VERSION}-alpine AS build-alpine
+# musl. The nginx source is the tarball the build stage verified, so the
+# Alpine image must hold the same nginx version as NGINX_IMAGE.
+FROM ${NGINX_ALPINE_IMAGE} AS build-alpine
 ARG NGINX_VERSION
+ARG NGINX_ALPINE_IMAGE
+RUN if [ "$(nginx -v 2>&1)" != "nginx version: nginx/${NGINX_VERSION}" ]; then \
+        echo "NGINX_ALPINE_IMAGE ${NGINX_ALPINE_IMAGE} is not nginx ${NGINX_VERSION}" >&2; \
+        exit 1; \
+    fi
 # hadolint ignore=DL3018
 RUN apk add --no-cache \
         build-base \
@@ -167,7 +183,7 @@ RUN ./configure --with-compat --with-stream --add-dynamic-module=../module && \
     cp objs/ngx_http_geoip2_module.so objs/ngx_stream_geoip2_module.so /build/
 
 # bash runs the stream checks of tests/run.sh inside the container.
-FROM nginx:${NGINX_VERSION}-alpine AS test-alpine
+FROM ${NGINX_ALPINE_IMAGE} AS test-alpine
 # hadolint ignore=DL3018
 RUN apk add --no-cache bash libmaxminddb-libs
 COPY --from=build-alpine /build/ngx_http_geoip2_module.so \

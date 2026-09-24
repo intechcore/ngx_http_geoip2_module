@@ -30,6 +30,14 @@ jobs:
         with:
           dockerfile: Dockerfile
 
+      # Each base image is pinned as nginx:<version>-<system>@sha256:<digest>,
+      # and the Debian and the Alpine image of a branch hold the same nginx.
+      - name: Check the nginx images
+        run: |
+          for branch in mainline stable; do
+            echo "$branch: nginx $(scripts/nginx-version.sh "$branch")"
+          done
+
   # Native runners per architecture: the module is compiled and tested without
   # QEMU emulation, for both nginx branches and for the Debian and the Alpine
   # nginx image. The test image is the official nginx image with libmaxminddb
@@ -53,11 +61,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Read the nginx version
+      - name: Read the nginx images
         id: nginx
         env:
           BRANCH: ${{ matrix.nginx }}
-        run: echo "version=$(scripts/nginx-version.sh "$BRANCH")" >> "$GITHUB_OUTPUT"
+        run: |
+          {
+            echo "image=$(scripts/nginx-image.sh "$BRANCH" debian)"
+            echo "alpine_image=$(scripts/nginx-image.sh "$BRANCH" alpine)"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -66,7 +78,9 @@ jobs:
         with:
           context: .
           target: ${{ matrix.os == 'alpine' && 'test-alpine' || 'test' }}
-          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
+          build-args: |
+            NGINX_IMAGE=${{ steps.nginx.outputs.image }}
+            NGINX_ALPINE_IMAGE=${{ steps.nginx.outputs.alpine_image }}
           load: true
           tags: geoip2:test
           cache-from: type=gha,scope=${{ env.CACHE_SCOPE }}

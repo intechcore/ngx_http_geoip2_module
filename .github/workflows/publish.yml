@@ -3,9 +3,10 @@ name: Publish
 # Publishes the module image ghcr.io/intechcore/ngx_http_geoip2_module:<nginx>-<n>
 # and a GitHub release with the same tag, for the mainline and the stable nginx
 # branch. It runs when a build input changes on master: the module sources, the
-# Dockerfile (for example a Renovate bump of an nginx version) or the nginx
-# signing keys. <n> counts the builds for one nginx version. The release holds
-# the http and the stream module for amd64 and arm64, built for the Debian and
+# Dockerfile (for example a Renovate bump of an nginx image, its version or its
+# digest) or the nginx signing keys. <n> counts the builds for one nginx
+# version. The release holds the http and the stream module for amd64 and
+# arm64, built for the Debian and
 # the Alpine nginx image. The build is reproducible: a branch whose modules
 # equal its last release is not published again.
 
@@ -57,11 +58,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Read the nginx version
+      - name: Read the nginx images
         id: nginx
         env:
           BRANCH: ${{ matrix.nginx }}
-        run: echo "version=$(scripts/nginx-version.sh "$BRANCH")" >> "$GITHUB_OUTPUT"
+        run: |
+          {
+            echo "image=$(scripts/nginx-image.sh "$BRANCH" debian)"
+            echo "alpine_image=$(scripts/nginx-image.sh "$BRANCH" alpine)"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -76,7 +81,9 @@ jobs:
         with:
           context: .
           target: test
-          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
+          build-args: |
+            NGINX_IMAGE=${{ steps.nginx.outputs.image }}
+            NGINX_ALPINE_IMAGE=${{ steps.nginx.outputs.alpine_image }}
           load: true
           tags: geoip2:test
           cache-from: type=gha,scope=${{ env.SCOPE }}
@@ -90,7 +97,9 @@ jobs:
         with:
           context: .
           target: test-alpine
-          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
+          build-args: |
+            NGINX_IMAGE=${{ steps.nginx.outputs.image }}
+            NGINX_ALPINE_IMAGE=${{ steps.nginx.outputs.alpine_image }}
           load: true
           tags: geoip2:test-alpine
           cache-from: type=gha,scope=${{ env.ALPINE_SCOPE }}
@@ -105,7 +114,9 @@ jobs:
         with:
           context: .
           target: module
-          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
+          build-args: |
+            NGINX_IMAGE=${{ steps.nginx.outputs.image }}
+            NGINX_ALPINE_IMAGE=${{ steps.nginx.outputs.alpine_image }}
           platforms: linux/${{ matrix.arch }}
           provenance: false
           cache-from: type=gha,scope=${{ env.SCOPE }}
@@ -129,7 +140,9 @@ jobs:
         with:
           context: .
           target: binaries
-          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
+          build-args: |
+            NGINX_IMAGE=${{ steps.nginx.outputs.image }}
+            NGINX_ALPINE_IMAGE=${{ steps.nginx.outputs.alpine_image }}
           platforms: linux/${{ matrix.arch }}
           cache-from: type=gha,scope=${{ env.SCOPE }}
           outputs: type=local,dest=binaries
@@ -139,7 +152,9 @@ jobs:
         with:
           context: .
           target: binaries-alpine
-          build-args: NGINX_VERSION=${{ steps.nginx.outputs.version }}
+          build-args: |
+            NGINX_IMAGE=${{ steps.nginx.outputs.image }}
+            NGINX_ALPINE_IMAGE=${{ steps.nginx.outputs.alpine_image }}
           platforms: linux/${{ matrix.arch }}
           cache-from: type=gha,scope=${{ env.ALPINE_SCOPE }}
           outputs: type=local,dest=binaries-alpine

@@ -6,6 +6,10 @@ commit `445df24`.
 ## [Unreleased]
 
 ### Security
+- The nginx base images are pinned by the digest of their multi-arch index, for both branches,
+  Debian and Alpine. The `Dockerfile` takes the full reference in `NGINX_IMAGE` and
+  `NGINX_ALPINE_IMAGE`, and the nginx version comes from its tag. Renovate updates the tag and
+  the digest, so each base change goes through a pull request and CI.
 - Fuzzing: `fuzz/fuzz_lookup.c` feeds random MaxMind databases to the shared lookup code.
   A workflow runs it in Debian 13 with AddressSanitizer and UndefinedBehaviorSanitizer on
   pull requests and weekly. A first local run of 3.3 million inputs found nothing.
