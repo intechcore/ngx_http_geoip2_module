@@ -1,0 +1,49 @@
+name: Fuzz
+
+# ClusterFuzzLite runs the libFuzzer targets in fuzz/ with AddressSanitizer
+# and UndefinedBehaviorSanitizer: on pull requests that change the module for
+# five minutes, and weekly for half an hour per sanitizer. A crash fails the
+# job and reports the input.
+
+on:
+  pull_request:
+    paths:
+      - 'ngx_*.[ch]'
+      - config
+      - 'fuzz/**'
+      - '.clusterfuzzlite/**'
+      - Dockerfile
+  schedule:
+    - cron: '41 4 * * 2'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  fuzz:
+    name: fuzz (${{ matrix.sanitizer }})
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    concurrency:
+      group: fuzz-${{ github.ref }}-${{ matrix.sanitizer }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, undefined]
+    steps:
+      - name: Build the fuzzers
+        uses: google/clusterfuzzlite/actions/build_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
+        with:
+          language: c
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          sanitizer: ${{ matrix.sanitizer }}
+
+      - name: Run the fuzzers
+        uses: google/clusterfuzzlite/actions/run_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fuzz-seconds: ${{ github.event_name == 'pull_request' && 300 || 1800 }}
+          mode: ${{ github.event_name == 'pull_request' && 'code-change' || 'batch' }}
+          sanitizer: ${{ matrix.sanitizer }}

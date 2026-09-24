@@ -6,6 +6,9 @@ commit `445df24`.
 ## [Unreleased]
 
 ### Security
+- Fuzzing: `fuzz/fuzz_lookup.c` feeds random MaxMind databases to the shared lookup code.
+  ClusterFuzzLite runs it with AddressSanitizer and UndefinedBehaviorSanitizer on pull
+  requests and weekly. A first local run of 3.3 million inputs found nothing.
 - Each release carries the signed provenance bundles of its files and of its image
   (`*.intoto.jsonl`), so the signatures travel with the downloads.
 - `verify-release.yml` runs as a reusable workflow called by `publish.yml` instead of on

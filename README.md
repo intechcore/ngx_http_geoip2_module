@@ -379,6 +379,26 @@ coverage. `GCOVR_EXCL` comments mark the code no test can reach, such as allocat
 
 The image and the release files carry a build provenance attestation.
 
+### Fuzzing
+
+`fuzz/fuzz_lookup.c` is a libFuzzer target for the lookup code both modules share: the input is
+a MaxMind database, the target looks up IPv4 and IPv6 addresses at many paths, with and without
+URI escaping, and reads the metadata values. [ClusterFuzzLite](https://google.github.io/clusterfuzzlite/)
+runs it with AddressSanitizer and UndefinedBehaviorSanitizer: five minutes on each pull request
+that changes the module, half an hour weekly (`.github/workflows/fuzz.yml`). The test databases
+are the seed corpus.
+
+Run it locally in a Debian container:
+
+```sh
+docker run --rm -v "$PWD:/src/repo:ro" debian:trixie bash -c '
+  apt-get update && apt-get install -y clang libclang-rt-dev libmaxminddb-dev curl \
+    ca-certificates gnupg gpgv make zip binutils
+  export CC=clang CXX=clang++ OUT=/out LIB_FUZZING_ENGINE=-fsanitize=fuzzer
+  export CFLAGS="-O1 -g -fsanitize=address,fuzzer-no-link" CXXFLAGS="$CFLAGS"
+  /src/repo/fuzz/build.sh && /out/fuzz_lookup -max_total_time=60 /src/repo/tests/fixtures'
+```
+
 ### nginx source signature
 
 The build downloads the nginx source from nginx.org and checks its GPG signature. The public
