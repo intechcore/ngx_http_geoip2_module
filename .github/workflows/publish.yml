@@ -220,7 +220,9 @@ jobs:
       # The image holds the same modules as the release, so equal checksums
       # mean an equal image too. Only the checksums count, not the file names.
       # A change of the image layout alone needs workflow_dispatch with force.
-      # The next tag is the last release number plus one.
+      # The next tag is one above the highest number taken by a release, a
+      # git tag or a package tag. Git and package tags stay when a release is
+      # deleted, so a number is never used twice.
       - name: Compare with the last release
         id: compare
         env:
@@ -231,6 +233,13 @@ jobs:
           nginx=$(scripts/nginx-version.sh "$BRANCH")
           last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 \
             --json tagName --jq '.[].tagName' | sed -n "s/^${nginx}-//p" | sort -n | tail -1)
+          # Each call on its own line, so a failed request fails the step.
+          tags=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${nginx}-" \
+            --jq '.[].ref | sub("^refs/tags/"; "")')
+          tags+=$'\n'$(gh api "/orgs/${GITHUB_REPOSITORY_OWNER}/packages/container/${GITHUB_REPOSITORY#*/}/versions" \
+            --paginate --jq '.[].metadata.container.tags[]')
+          taken=$(printf '%s\n' "${nginx}-${last:-0}" "$tags" |
+            sed -n "s/^${nginx}-\([0-9][0-9]*\)$/\1/p" | sort -n | tail -1)
           changed=true
           if [[ $FORCE != true && -n $last ]] &&
             gh release download "$nginx-$last" --repo "$GITHUB_REPOSITORY" \
@@ -240,13 +249,19 @@ jobs:
             echo "## ${BRANCH}: unchanged" >> "$GITHUB_STEP_SUMMARY"
             echo "The modules equal the release $nginx-$last. Nothing is published." >> "$GITHUB_STEP_SUMMARY"
           fi
-          tag="$nginx-$(( ${last:-0} + 1 ))"
+          tag="$nginx-$(( taken + 1 ))"
+          # Never attach a release to an existing tag: gh would reuse its commit.
+          if [[ $changed == true ]] &&
+            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" > /dev/null 2>&1; then
+            echo "::error::tag ${tag} already exists"
+            exit 1
+          fi
           {
             echo "changed=$changed"
             echo "nginx=$nginx"
             echo "tag=$tag"
           } >> "$GITHUB_OUTPUT"
-          echo "Last release $nginx-${last:-none}, changed: $changed, next: $tag"
+          echo "Last release $nginx-${last:-none}, highest taken $nginx-${taken}, changed: $changed, next: $tag"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         if: steps.compare.outputs.changed == 'true'
