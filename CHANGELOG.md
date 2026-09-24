@@ -49,6 +49,8 @@ commit `445df24`.
   client address after a reload (upstream #134). From upstream PR #138 by Felipe Travi.
 - `auto_reload` never loaded a new database whose mtime was older than the nginx start. The
   module now also compares the inode and the size. From upstream PR #138 by Felipe Travi.
+- Renovate takes its common rules from the shared preset `github>intechcore/renovate-config`,
+  which also turns on OSV vulnerability alerts.
 
 ### Added
 - Static analysis in CI with gcc -fanalyzer, clang-tidy and cppcheck (`make analyze`). A finding
