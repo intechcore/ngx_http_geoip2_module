@@ -419,6 +419,11 @@ that is not in `keys/`, the build fails on purpose. To fix it:
 2. Add the key file to `keys/`.
 3. Open a pull request.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md): build and test, the rules for tests, commits and pull
+requests. Report vulnerabilities privately, see [SECURITY.md](SECURITY.md).
+
 ## License
 
 BSD-2-Clause, see [LICENSE](LICENSE).

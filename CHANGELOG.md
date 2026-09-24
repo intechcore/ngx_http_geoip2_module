@@ -53,6 +53,9 @@ commit `445df24`.
   which also turns on OSV vulnerability alerts.
 
 ### Added
+- `CONTRIBUTING.md`: build and test commands, tests with every change and a failing test first
+  for a bug fix, Conventional Commits, signed commits, squash merge, the required checks and how
+  to report a vulnerability. The README links it.
 - Static analysis in CI with gcc -fanalyzer, clang-tidy and cppcheck (`make analyze`). A finding
   fails the build.
 - The module image holds the stream module as well, `/ngx_stream_geoip2_module.so`.
