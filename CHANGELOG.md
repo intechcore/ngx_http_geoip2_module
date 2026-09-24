@@ -1,8 +1,18 @@
 # Changelog
 
-Changes of this fork. Upstream history is in the git log up to commit `445df24`.
+Changes of this project. The history of leev/ngx_http_geoip2_module is in the git log up to
+commit `445df24`.
 
 ## [Unreleased]
+
+### Security
+- Each release carries the signed provenance bundles of its files and of its image
+  (`*.intoto.jsonl`), so the signatures travel with the downloads.
+- `verify-release.yml` runs as a reusable workflow called by `publish.yml` instead of on
+  `workflow_run`.
+- The test database generator takes `golang.org/x/sys` 0.48.0 (GO-2026-5024). Renovate
+  updates the generator again.
+- `SECURITY.md` links the private vulnerability report form.
 
 ### Fixed
 - A float or double beyond the int64 range, NaN or infinity made nginx print undefined digits.

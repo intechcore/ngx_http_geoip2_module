@@ -275,6 +275,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        id: attest-image
         if: steps.compare.outputs.changed == 'true'
         with:
           subject-name: ${{ env.IMAGE }}
@@ -282,6 +283,7 @@ jobs:
           push-to-registry: true
 
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        id: attest-files
         if: steps.compare.outputs.changed == 'true'
         with:
           subject-path: binaries/*.so
@@ -293,7 +295,13 @@ jobs:
           TAG: ${{ steps.compare.outputs.tag }}
           NGINX: ${{ steps.compare.outputs.nginx }}
           BRANCH: ${{ matrix.nginx }}
+          FILES_BUNDLE: ${{ steps.attest-files.outputs.bundle-path }}
+          IMAGE_BUNDLE: ${{ steps.attest-image.outputs.bundle-path }}
         run: |
+          # The signed provenance bundles go into the release too, so the
+          # signatures travel with the files.
+          cp "$FILES_BUNDLE" "binaries/ngx_http_geoip2_module-${TAG}.intoto.jsonl"
+          cp "$IMAGE_BUNDLE" "binaries/ngx_http_geoip2_module-${TAG}-image.intoto.jsonl"
           cat > notes.md <<EOF
           ngx_http_geoip2_module and ngx_stream_geoip2_module for nginx ${NGINX} (${BRANCH}), amd64 and arm64.
 
@@ -321,7 +329,15 @@ jobs:
             latest=false
           fi
           # BSD-2-Clause: a binary distribution carries the license.
-          gh release create "$TAG" binaries/*.so binaries/SHA256SUMS LICENSE \
+          gh release create "$TAG" binaries/*.so binaries/*.intoto.jsonl binaries/SHA256SUMS LICENSE \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "$TAG" --notes-file notes.md --latest="$latest"
           echo "- release [${TAG}](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG})" >> "$GITHUB_STEP_SUMMARY"
+
+  # Checks the published artifacts the way users take them.
+  verify:
+    needs: publish
+    permissions:
+      contents: read
+      attestations: read
+    uses: ./.github/workflows/verify-release.yml
