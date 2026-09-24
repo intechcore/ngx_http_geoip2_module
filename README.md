@@ -3,6 +3,7 @@
 [![CI](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml/badge.svg)](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/ci.yml)
 [![Verify release](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/verify-release.yml/badge.svg)](https://github.com/intechcore/ngx_http_geoip2_module/actions/workflows/verify-release.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/intechcore/ngx_http_geoip2_module/badge)](https://scorecard.dev/viewer/?uri=github.com/intechcore/ngx_http_geoip2_module)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14789/badge)](https://www.bestpractices.dev/projects/14789)
 [![Release](https://img.shields.io/github/v/release/intechcore/ngx_http_geoip2_module)](https://github.com/intechcore/ngx_http_geoip2_module/releases)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-orange.svg)](LICENSE)
 
