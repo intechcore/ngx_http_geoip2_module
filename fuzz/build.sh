@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Builds the fuzz targets. ClusterFuzzLite runs it in its builder image with
-# CC, CFLAGS, LIB_FUZZING_ENGINE and OUT set (see .clusterfuzzlite/). The
-# nginx core objects of the mainline version link into each target, and
-# libmaxminddb links statically, so the target runs on the runner image.
+# Builds the fuzz targets into $OUT, with the compiler and the sanitizer flags
+# in CC, CXX, CFLAGS, CXXFLAGS and LIB_FUZZING_ENGINE. The fuzz workflow runs
+# it in Debian 13, see .github/workflows/fuzz.yml. The nginx core objects of the
+# mainline version link into each target, and so does the libmaxminddb of the
+# system, the one the images use.
 set -euo pipefail
 
-# Set by the ClusterFuzzLite builder image, or by hand for a local build.
+# Set by the fuzz workflow, or by hand for a local build.
 : "${CC:?}" "${CXX:?}" "${CFLAGS?}" "${CXXFLAGS?}" "${LIB_FUZZING_ENGINE:?}" "${OUT:?}"
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -41,9 +42,7 @@ for target in "$REPO"/fuzz/fuzz_*.c; do
     "$CC" "${cc_options[@]}" -I src/core -I src/event -I src/os/unix -I objs \
         -c "$target" -o "$name.o"
     "$CXX" "${cxx_options[@]}" "$name.o" "${objects[@]}" "${engine_options[@]}" \
-        -Wl,-Bstatic -lmaxminddb -Wl,-Bdynamic -lcrypt -lpthread -ldl \
+        -lmaxminddb -lcrypt -lpthread -ldl \
         -o "$OUT/$name"
 done
 
-# The test databases are the seed corpus.
-(cd "$REPO/tests/fixtures" && zip -q -j "$OUT/fuzz_lookup_seed_corpus.zip" ./*.mmdb)

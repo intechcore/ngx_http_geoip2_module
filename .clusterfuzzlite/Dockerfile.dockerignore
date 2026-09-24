@@ -1,3 +1,0 @@
-# The root .dockerignore drops tests/fixtures, the seed corpus of the fuzzer.
-.git
-build
