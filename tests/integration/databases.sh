@@ -9,7 +9,7 @@ set -euo pipefail
 # Renovate proposes new commits monthly. If a database changes, the checksum
 # check fails: check the expected values in run.sh, then update the sums.
 # renovate: maxmind-db
-COMMIT=0eef25a46e20f4e96d27b951d0228efabe21323f
+COMMIT=276926d23b4109ca5452709bfb5931c338afb34c
 DIR="$(cd "$(dirname "$0")" && pwd)/databases"
 
 sha256() {
