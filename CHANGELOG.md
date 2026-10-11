@@ -31,6 +31,10 @@ commit `445df24`.
 - `SECURITY.md` links the private vulnerability report form.
 
 ### Fixed
+- The release notes compare a release with the last release of its nginx branch before it: the
+  nearest tag in its history with the same minor parity, odd for mainline and even for stable.
+  The highest tag of the same major.minor let a withdrawn or skipped build stay the base of
+  every later note, as in intechcore/openldap, and found no tag at all after the yearly bump.
 - The publish workflow counts git tags and package tags as taken build numbers, next to the
   releases, and never attaches a release to an existing tag. A deleted release could free its
   number, and the next release would have reused it and its old git tag.
