@@ -407,11 +407,22 @@ jobs:
             cp "sbom/${arch}.spdx.json" "binaries/ngx_http_geoip2_module-${TAG}-${arch}.spdx.json"
           done
           # The notes start with what changed since the previous release of
-          # this branch, the newest tag of the same major.minor, with or
-          # without v, from CHANGELOG.md. See .github/scripts/release-notes.sh.
-          series=${NGINX%.*}
-          PREV_TAG=$(git tag | sed -n -E "s/^(v?)(${series//./\\.}\.[0-9]+-[0-9]+)$/\2 \1\2/p" |
-            sort -V -k1,1 | tail -1 | cut -d' ' -f2 || true)
+          # this nginx branch, from CHANGELOG.md: the nearest tag in the history
+          # of this commit, with or without v, whose minor version has the same
+          # parity, odd for mainline and even for stable. Not the highest tag,
+          # so that a withdrawn or skipped build does not stay the base of every
+          # later note, and not the same major.minor, which the yearly bump
+          # (1.31 to 1.33) leaves without a tag. Of the tags of that commit the
+          # highest, since a rebuild tags the same commit again. The awk steps read
+          # to the end, so the pipe of git log never breaks. See .github/scripts/release-notes.sh.
+          minor=${NGINX#*.}
+          parity=$(( ${minor%%.*} % 2 ))
+          PREV_TAG=$(git log --format=%D --decorate-refs='refs/tags/*' "$GITHUB_SHA" |
+            awk -v p="$parity" '{ n = split($0, refs, /, /)
+              for (i = 1; i <= n; i++) if (refs[i] ~ /^tag: v?[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$/) {
+                tag = substr(refs[i], 6); split(tag, part, ".")
+                if (part[2] % 2 == p) print NR, tag } }' |
+            awk 'NR == 1 { commit = $1 } $1 == commit { print $2 }' | sort -V | tail -1)
           TAG="v$TAG" PREV_TAG="$PREV_TAG" PRODUCT=nginx COMMITS=false .github/scripts/release-notes.sh > notes.md
           cat >> notes.md <<EOF
           ## Files
