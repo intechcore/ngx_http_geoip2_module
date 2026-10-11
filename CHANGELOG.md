@@ -8,73 +8,6 @@ commit `445df24`.
 
 ## [Unreleased]
 
-### Changed
-- CI pins ShellCheck and sets a timeout on every job; CI and Fuzz cancel superseded pull request runs.
-
-### Security
-- Each release carries the SPDX SBOM of the module image for amd64 and arm64, and the image
-  holds a signed SBOM attestation on each platform digest.
-- CI lints the workflows with actionlint and audits them with zizmor.
-- The nginx base images are pinned by the digest of their multi-arch index, for both branches,
-  Debian and Alpine. The `Dockerfile` takes the full reference in `NGINX_IMAGE` and
-  `NGINX_ALPINE_IMAGE`, and the nginx version comes from its tag. Renovate updates the tag and
-  the digest, so each base change goes through a pull request and CI.
-- Fuzzing: `fuzz/fuzz_lookup.c` feeds random MaxMind databases to the shared lookup code.
-  A workflow runs it in Debian 13 with AddressSanitizer and UndefinedBehaviorSanitizer on
-  pull requests and weekly. A first local run of 3.3 million inputs found nothing.
-- Each release carries the signed provenance bundles of its files and of its image
-  (`*.intoto.jsonl`), so the signatures travel with the downloads.
-- `verify-release.yml` runs as a reusable workflow called by `publish.yml` instead of on
-  `workflow_run`.
-- The test database generator takes `golang.org/x/sys` 0.48.0 (GO-2026-5024). Renovate
-  updates the generator again.
-- `SECURITY.md` links the private vulnerability report form.
-
-### Fixed
-- The release notes compare a release with the last release of its nginx branch before it: the
-  nearest tag in its history with the same minor parity, odd for mainline and even for stable.
-  The highest tag of the same major.minor let a withdrawn or skipped build stay the base of
-  every later note, as in intechcore/openldap, and found no tag at all after the yearly bump.
-- The publish workflow counts git tags and package tags as taken build numbers, next to the
-  releases, and never attaches a release to an existing tag. A deleted release could free its
-  number, and the next release would have reused it and its old git tag.
-- A float or double beyond the int64 range, NaN or infinity made nginx print undefined digits.
-  The lookup now treats such a value as not found.
-- A heap overflow in both modules: a uint128 value (34 characters) or a double with 14 or
-  more integer digits went into a buffer of 20 bytes. The buffer now holds 64 bytes, and
-  the write is bounded.
-- `$var metadata` without a field read past the arguments of the directive, and `$var;`
-  without arguments read past them as well. Both modules.
-
-### Changed
-- Releases and their git tags are named `v<nginx>-<n>` from the next release on, for example
-  `v1.31.6-15`. Image tags and file names keep `<nginx>-<n>`. The build counter counts tags
-  and releases with and without the `v`.
-- The repository gained `.editorconfig`, a disclaimer in the README, and SECURITY.md and
-  CONTRIBUTING.md in the shared layout. CI runs on `ubuntu-latest` and `ubuntu-24.04-arm`.
-- The GitHub release notes start with a summary of what changed since the previous release of
-  the branch: the nginx version move and the new CHANGELOG entries. Before, they listed the files
-  only. `.github/scripts/release-notes.sh` writes the summary.
-- A variable name that a geoip2 block already defines is a configuration error. Before, the
-  last definition replaced the first one without a message.
-- A missing database file at an `auto_reload` check is logged as `error`, not `emerg`. The
-  module keeps the loaded database, so nginx is not in danger.
-- The http and the stream module share their database code in `ngx_geoip2_common.h`:
-  opening, lookups with the cache, value formatting, variable arguments, metadata,
-  `auto_reload` and the value of a variable. A fix there applies to both modules.
-- A `$var metadata` directive with an unknown field or a wrong number of arguments is now a
-  configuration error. Before, the variable was empty at run time, and a field matched by
-  its prefix only: `build_epochs` gave the build epoch.
-- The stream module crashed `nginx -t` on an invalid `auto_reload` interval. It passed the
-  string by value to `%V`. Upstream fixed the same line in the http module (#90), not in the
-  stream module. Found by SonarCloud (c:S5270).
-- `auto_reload` returned the cached lookup result of the old, closed database for the same
-  client address after a reload (upstream #134). From upstream PR #138 by Felipe Travi.
-- `auto_reload` never loaded a new database whose mtime was older than the nginx start. The
-  module now also compares the inode and the size. From upstream PR #138 by Felipe Travi.
-- Renovate takes its common rules from the shared preset `github>intechcore/renovate-config`,
-  which also turns on OSV vulnerability alerts.
-
 ### Added
 - `CONTRIBUTING.md`: build and test commands, tests with every change and a failing test first
   for a bug fix, Conventional Commits, signed commits, squash merge, the required checks and how
@@ -114,3 +47,72 @@ commit `445df24`.
 - Renovate for the nginx version and the GitHub Actions, pinned by SHA.
 - SonarCloud analysis in CI with test coverage. A `coverage` build stage compiles both modules
   with gcov and records the compile commands.
+
+### Changed
+- CI pins ShellCheck and sets a timeout on every job; CI and Fuzz cancel superseded pull request runs.
+- Releases and their git tags are named `v<nginx>-<n>` from the next release on, for example
+  `v1.31.6-15`. Image tags and file names keep `<nginx>-<n>`. The build counter counts tags
+  and releases with and without the `v`.
+- The repository gained `.editorconfig`, a disclaimer in the README, and SECURITY.md and
+  CONTRIBUTING.md in the shared layout. CI runs on `ubuntu-latest` and `ubuntu-24.04-arm`.
+- The GitHub release notes start with a summary of what changed since the previous release of
+  the branch: the nginx version move and the new CHANGELOG entries. Before, they listed the files
+  only. `.github/scripts/release-notes.sh` writes the summary.
+- A variable name that a geoip2 block already defines is a configuration error. Before, the
+  last definition replaced the first one without a message.
+- A missing database file at an `auto_reload` check is logged as `error`, not `emerg`. The
+  module keeps the loaded database, so nginx is not in danger.
+- The http and the stream module share their database code in `ngx_geoip2_common.h`:
+  opening, lookups with the cache, value formatting, variable arguments, metadata,
+  `auto_reload` and the value of a variable. A fix there applies to both modules.
+- A `$var metadata` directive with an unknown field or a wrong number of arguments is now a
+  configuration error. Before, the variable was empty at run time, and a field matched by
+  its prefix only: `build_epochs` gave the build epoch.
+- Renovate takes its common rules from the shared preset `github>intechcore/renovate-config`,
+  which also turns on OSV vulnerability alerts.
+
+### Fixed
+- `LICENSE` carries the copyright notice of Andrei Belov, next to Lee Valentine. His code is in
+  the stream module and the shared header, and BSD-2-Clause asks a binary release to reproduce
+  every notice.
+- The release notes compare a release with the last release of its nginx branch before it: the
+  nearest tag in its history with the same minor parity, odd for mainline and even for stable.
+  The highest tag of the same major.minor let a withdrawn or skipped build stay the base of
+  every later note, as in intechcore/openldap, and found no tag at all after the yearly bump.
+- The publish workflow counts git tags and package tags as taken build numbers, next to the
+  releases, and never attaches a release to an existing tag. A deleted release could free its
+  number, and the next release would have reused it and its old git tag.
+- A float or double beyond the int64 range, NaN or infinity made nginx print undefined digits.
+  The lookup now treats such a value as not found.
+- A heap overflow in both modules: a uint128 value (34 characters) or a double with 14 or
+  more integer digits went into a buffer of 20 bytes. The buffer now holds 64 bytes, and
+  the write is bounded.
+- `$var metadata` without a field read past the arguments of the directive, and `$var;`
+  without arguments read past them as well. Both modules.
+- The stream module crashed `nginx -t` on an invalid `auto_reload` interval. It passed the
+  string by value to `%V`. Upstream fixed the same line in the http module (#90), not in the
+  stream module. Found by SonarCloud (c:S5270).
+- `auto_reload` returned the cached lookup result of the old, closed database for the same
+  client address after a reload (upstream #134). From upstream PR #138 by Felipe Travi.
+- `auto_reload` never loaded a new database whose mtime was older than the nginx start. The
+  module now also compares the inode and the size. From upstream PR #138 by Felipe Travi.
+
+### Security
+- Each release carries the SPDX SBOM of the module image for amd64 and arm64, and the image
+  holds a signed SBOM attestation on each platform digest.
+- CI lints the workflows with actionlint and audits them with zizmor.
+- The nginx base images are pinned by the digest of their multi-arch index, for both branches,
+  Debian and Alpine. The `Dockerfile` takes the full reference in `NGINX_IMAGE` and
+  `NGINX_ALPINE_IMAGE`, and the nginx version comes from its tag. Renovate updates the tag and
+  the digest, so each base change goes through a pull request and CI.
+- Fuzzing: `fuzz/fuzz_lookup.c` feeds random MaxMind databases to the shared lookup code.
+  A workflow runs it in Debian 13 with AddressSanitizer and UndefinedBehaviorSanitizer on
+  pull requests and weekly. A first local run of 3.3 million inputs found nothing.
+- Each release carries the signed provenance bundles of its files and of its image
+  (`*.intoto.jsonl`), so the signatures travel with the downloads.
+- `verify-release.yml` runs as a reusable workflow called by `publish.yml` instead of on
+  `workflow_run`.
+- The test database generator takes `golang.org/x/sys` 0.48.0 (GO-2026-5024). Renovate
+  updates the generator again.
+- `SECURITY.md` links the private vulnerability report form.
+
