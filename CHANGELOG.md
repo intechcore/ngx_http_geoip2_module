@@ -72,6 +72,9 @@ commit `445df24`.
   which also turns on OSV vulnerability alerts.
 
 ### Fixed
+- `LICENSE` carries the copyright notice of Andrei Belov, next to Lee Valentine. His code is in
+  the stream module and the shared header, and BSD-2-Clause asks a binary release to reproduce
+  every notice.
 - The release notes compare a release with the last release of its nginx branch before it: the
   nearest tag in its history with the same minor parity, odd for mainline and even for stable.
   The highest tag of the same major.minor let a withdrawn or skipped build stay the base of
