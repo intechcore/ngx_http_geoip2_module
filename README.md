@@ -88,7 +88,7 @@ COPY --from=ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6 \
      /ngx_http_geoip2_module.so /ngx_stream_geoip2_module.so /usr/lib/nginx/modules/
 ```
 
-For stable, use `nginx:1.30.5-trixie` and `ngx_http_geoip2_module:1.30.5`.
+For stable, use `nginx:1.30.6-trixie` and `ngx_http_geoip2_module:1.30.6`.
 
 The publish workflow signs a build provenance attestation for each image and release file. It
 states which workflow of this repository built the artifact, and from which commit. A check
