@@ -81,10 +81,10 @@ The image holds only `/ngx_http_geoip2_module.so` and `/ngx_stream_geoip2_module
 modules you need into the nginx image of the same version, here mainline:
 
 ```dockerfile
-FROM nginx:1.31.6-trixie
+FROM nginx:1.31.7-trixie
 RUN apt-get update && apt-get install -y --no-install-recommends libmaxminddb0 \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6 \
+COPY --from=ghcr.io/intechcore/ngx_http_geoip2_module:1.31.7 \
      /ngx_http_geoip2_module.so /ngx_stream_geoip2_module.so /usr/lib/nginx/modules/
 ```
 
@@ -95,7 +95,7 @@ states which workflow of this repository built the artifact, and from which comm
 proves that the artifact comes from this CI and nobody changed it later:
 
 ```sh
-gh attestation verify oci://ghcr.io/intechcore/ngx_http_geoip2_module:1.31.6 \
+gh attestation verify oci://ghcr.io/intechcore/ngx_http_geoip2_module:1.31.7 \
   --owner intechcore
 ```
 
@@ -125,9 +125,9 @@ sudo install -m 644 ngx_http_geoip2_module-*-debian-amd64.so \
 2. Download and unpack the nginx source of your nginx version:
 
    ```sh
-   curl -fsSLO https://nginx.org/download/nginx-1.31.6.tar.gz
-   tar xzf nginx-1.31.6.tar.gz
-   cd nginx-1.31.6
+   curl -fsSLO https://nginx.org/download/nginx-1.31.7.tar.gz
+   tar xzf nginx-1.31.7.tar.gz
+   cd nginx-1.31.7
    ```
 
 3. Build the modules. `--with-stream` adds the stream module:
