@@ -137,6 +137,10 @@ jobs:
           path: digests/*
           retention-days: 1
 
+      # The SBOM action writes its file but does not create the directory.
+      - name: Create the SBOM directory
+        run: mkdir -p sbom
+
       # The SBOM lists what the pushed module image holds. The publish job
       # attests it on the platform digest and attaches it to the release.
       - name: Generate the SBOM
