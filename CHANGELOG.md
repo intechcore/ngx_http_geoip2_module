@@ -72,6 +72,8 @@ commit `445df24`.
   which also turns on OSV vulnerability alerts.
 
 ### Fixed
+- The publish creates the SBOM directory before the SBOM action writes into it. Every publish
+  since the SBOMs came in failed on the missing directory, so no module was released.
 - `LICENSE` carries the copyright notice of Andrei Belov, next to Lee Valentine. His code is in
   the stream module and the shared header, and BSD-2-Clause asks a binary release to reproduce
   every notice.
