@@ -24,7 +24,7 @@ ARG NGINX_IMAGE=nginx:1.31.7-trixie@sha256:8632b3314d74c61f0e27f59055bab13f7793b
 # renovate: branch=mainline nginx
 ARG NGINX_ALPINE_IMAGE=nginx:1.31.7-alpine@sha256:892bb2152464f0c5d8972593a5f5afaf8054552580b699d95f8ff4af08c2d33d
 # renovate: branch=stable nginx
-ARG NGINX_STABLE_IMAGE=nginx:1.30.6-trixie@sha256:0e99fef52612699fd524e2a5111e8c6397cf29f24ae1b48d3902b8d65b14bbbf
+ARG NGINX_STABLE_IMAGE=nginx:1.30.6-trixie@sha256:a7675fcee220f59b4a99f7098c06a0d5d999c2c0ee37c0211efb780536e5cb20
 # renovate: branch=stable nginx
 ARG NGINX_STABLE_ALPINE_IMAGE=nginx:1.30.6-alpine@sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5
 
