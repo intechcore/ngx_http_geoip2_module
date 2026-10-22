@@ -20,7 +20,7 @@
 # CI builds stable with --build-arg NGINX_IMAGE and NGINX_ALPINE_IMAGE. Renovate
 # updates the tag and the digest, one pull request per branch.
 # renovate: branch=mainline nginx
-ARG NGINX_IMAGE=nginx:1.31.8-trixie@sha256:5f34fe8b6d99aabc9425c176abd6c0adb091833b9001fe9e9c3766de9e04a354
+ARG NGINX_IMAGE=nginx:1.31.8-trixie@sha256:6e67f8eaac94fc456588d4ff6c470d984841f5b5dc4279863d5cbe6ec5a60def
 # renovate: branch=mainline nginx
 ARG NGINX_ALPINE_IMAGE=nginx:1.31.8-alpine@sha256:e2d97c2b8c016f12c2f1a27d095685063b2f281c4edf2babfde6001cf4fb77a8
 # renovate: branch=stable nginx
