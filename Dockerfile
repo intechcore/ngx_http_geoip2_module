@@ -26,7 +26,7 @@ ARG NGINX_ALPINE_IMAGE=nginx:1.31.8-alpine@sha256:785835ea65db4bba6f021acc0f3be9
 # renovate: branch=stable nginx
 ARG NGINX_STABLE_IMAGE=nginx:1.30.6-trixie@sha256:51047bea59fed88fbd1f52565d2f5fabcb82d311cf6c9e507a10ce74bb3bc3f0
 # renovate: branch=stable nginx
-ARG NGINX_STABLE_ALPINE_IMAGE=nginx:1.30.6-alpine@sha256:47928bf67eb62a1863cb08d9ecb52d3e704304ba614eaee17884204677702951
+ARG NGINX_STABLE_ALPINE_IMAGE=nginx:1.30.6-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
 
 # The nginx version comes from the tag of NGINX_IMAGE:
 # nginx:1.31.6-trixie@sha256:... gives 1.31.6.
