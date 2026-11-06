@@ -357,8 +357,8 @@ every configuration error. The stream checks send the client address in a PROXY 
 The fixture databases come from `tests/fixtures/generate`.
 
 `tests/integration/run.sh` runs the modules the way users do. It downloads the MaxMind test
-databases of a fixed commit of [MaxMind-DB](https://github.com/maxmind/MaxMind-DB) and checks
-their checksums. They have the real GeoLite2 City, Country and ASN schema. The expected values
+databases of a fixed commit of [MaxMind-DB](https://github.com/maxmind/MaxMind-DB). Renovate
+updates the commit. They have the real GeoLite2 City, Country and ASN schema. The expected values
 come from `mmdblookup` on the same databases.
 
 It then starts a proxy topology with docker compose (`tests/integration/proxies`): a client

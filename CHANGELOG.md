@@ -20,7 +20,8 @@ commit `445df24`.
 - Integration tests with the MaxMind test databases (real GeoLite2 City, Country and ASN
   schema) and behind proxies (a CDN, a load balancer and an upstream application in docker
   compose), and under load while the database is replaced and nginx reloads, for both
-  modules, in CI on Debian, Alpine and the sanitizer build (`make integration`).
+  modules, in CI on Debian, Alpine and the sanitizer build (`make integration`). Renovate
+  updates the commit of the MaxMind databases, and the update merges if the tests pass.
 - The variable option `escape=uri` percent-encodes the value, for example for a request
   header to an upstream server that rejects non-ASCII bytes. Both modules. Upstream #125.
 - Tests in `tests/` for the http and the stream module: every MMDB data type, lookups over
