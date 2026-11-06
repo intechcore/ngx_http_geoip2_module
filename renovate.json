@@ -73,7 +73,7 @@
       "groupName": "nginx stable"
     },
     {
-      "description": "The MaxMind test databases change rarely: check monthly. A changed database fails the checksums in databases.sh until someone checks the expected values in tests/integration/run.sh.",
+      "description": "The MaxMind test databases change rarely: check monthly. The commit fixes the content. A changed value fails tests/integration/run.sh, an unchanged one lets the update merge by itself.",
       "matchDepNames": ["MaxMind-DB test data"],
       "schedule": ["* 0-6 1 * *"]
     }
