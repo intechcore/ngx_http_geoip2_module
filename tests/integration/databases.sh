@@ -9,7 +9,7 @@ set -euo pipefail
 # Renovate updates the commit monthly. The commit fixes the content of the
 # files. If MaxMind changes a value the tests use, tests/integration/run.sh fails.
 # renovate: maxmind-db
-COMMIT=276926d23b4109ca5452709bfb5931c338afb34c
+COMMIT=55f9b2727fd5ab22ce175b475afbcd44c64dd009
 DIR="$(cd "$(dirname "$0")" && pwd)/databases"
 NAMES=(GeoLite2-ASN-Test.mmdb GeoLite2-City-Test.mmdb GeoLite2-Country-Test.mmdb)
 
