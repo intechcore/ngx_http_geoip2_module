@@ -24,9 +24,9 @@ ARG NGINX_IMAGE=nginx:1.31.9-trixie@sha256:84f7876d21d154885f99554d7ae325d8c2213
 # renovate: branch=mainline nginx
 ARG NGINX_ALPINE_IMAGE=nginx:1.31.9-alpine@sha256:fb4658584bd9a916ffb6f6e365f97c25cfdb2923801f551ea08356e695f14ff7
 # renovate: branch=stable nginx
-ARG NGINX_STABLE_IMAGE=nginx:1.30.7-trixie@sha256:7fad6c0dff97965adbddf28027d934b111fc0221a554315dc274712f3fba24d3
+ARG NGINX_STABLE_IMAGE=nginx:1.30.8-trixie@sha256:755983e0e0e568e4c86297cc91485d7a6f9fb73e42d8a19cdba3eac9e8b8cfc9
 # renovate: branch=stable nginx
-ARG NGINX_STABLE_ALPINE_IMAGE=nginx:1.30.7-alpine@sha256:caf4e1e032a20f9c3c5e28fc7f25ffd768ad8677b4975c54193075997b3a97e3
+ARG NGINX_STABLE_ALPINE_IMAGE=nginx:1.30.8-alpine@sha256:8eb04fe3b385090e9aa02961f77398ad09b6bf33ab07f6669a5bb7acce22c0d3
 
 # The nginx version comes from the tag of NGINX_IMAGE:
 # nginx:1.31.6-trixie@sha256:... gives 1.31.6.
